@@ -9,18 +9,7 @@
     box-sizing:border-box;
     padding-top:env(safe-area-inset-top,0px);
     padding-bottom:env(safe-area-inset-bottom,0px);
-    --bg:#1c1e22;
-    --row-a:#26292e;
-    --row-b:#1c1e22;
-    --grid:#000000;
-    --label-bg:#c9d3df;
-    --label-fg:#111418;
-    --amber:#e08a1e;
-    --amber-soft:#e08a1e;
-    --line:#ffffff;
-    --good:#39d353;
-    --text:#e8eaed;
-    --muted:#8a929c;
+    --bg:#1c1e22; --amber:#e08a1e; --good:#39d353; --text:#e8eaed; --muted:#8a929c;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{height:100%;margin:0;background:var(--bg);color:var(--text);
@@ -29,7 +18,6 @@
   #stage{position:relative;flex:1;min-height:0;}
   canvas{display:block;width:100%;height:100%;touch-action:none;}
 
-  /* Medidor de cents (arriba) */
   #cents{position:absolute;top:14px;left:50%;transform:translateX(-50%);
     width:min(70%,360px);background:rgba(20,22,26,.72);border:1px solid #3a3f47;
     border-radius:12px;padding:10px 16px 14px;backdrop-filter:blur(6px);}
@@ -41,14 +29,15 @@
     background:var(--amber);transform:translate(-50%,-50%);transition:left .06s linear,background .1s;
     box-shadow:0 0 8px rgba(224,138,30,.6);opacity:.25;}
 
-  /* Lectura actual (arriba-izq) */
-  #read{position:absolute;top:14px;left:14px;font-variant-numeric:tabular-nums;}
+  #read{position:absolute;top:14px;left:14px;font-variant-numeric:tabular-nums;width:150px;}
   #read .note{font-size:26px;font-weight:700;line-height:1;}
-  #read .hz{font-size:13px;color:var(--muted);margin-top:3px;}
+  #read .hz{font-size:12px;color:var(--muted);margin-top:3px;min-height:15px;}
+  /* Medidor de nivel de entrada */
+  #level{margin-top:7px;height:7px;width:130px;background:#2a2e34;border-radius:4px;overflow:hidden;}
+  #levelFill{height:100%;width:0%;background:var(--good);transition:width .05s linear;}
 
-  /* Barra inferior */
-  #bar{display:flex;align-items:center;gap:14px;padding:12px 16px;
-    padding-bottom:calc(12px + env(safe-area-inset-bottom,0px));
+  #bar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:10px 16px;
+    padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
     background:#141619;border-top:1px solid #2a2e34;}
   button{font:inherit;color:var(--text);background:#2a2e34;border:1px solid #3a3f47;
     border-radius:10px;padding:11px 16px;font-weight:600;cursor:pointer;}
@@ -56,25 +45,28 @@
   #start{background:var(--amber);color:#1a1204;border-color:var(--amber);}
   #start.rec{background:#c0392b;color:#fff;border-color:#c0392b;}
   #clear{margin-left:auto;}
+  #sensWrap{display:flex;align-items:center;gap:8px;flex:1;min-width:180px;color:var(--muted);font-size:13px;}
+  #sens{flex:1;accent-color:var(--amber);}
 
-  /* Overlay de permiso / error */
   #overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
     padding:24px;background:rgba(16,18,20,.82);backdrop-filter:blur(4px);text-align:center;z-index:5;}
   #overlay.hidden{display:none;}
-  #overlay .card{max-width:420px;background:#20242a;border:1px solid #333a42;
-    border-radius:16px;padding:26px 24px;}
+  #overlay .card{max-width:420px;background:#20242a;border:1px solid #333a42;border-radius:16px;padding:26px 24px;}
   #overlay h1{font-size:19px;margin:0 0 8px;}
   #overlay p{color:var(--muted);font-size:14px;line-height:1.5;margin:0 0 18px;}
   #overlay code{background:#12151a;padding:2px 6px;border-radius:6px;color:#e0c98a;font-size:13px;}
-  #overlay button{background:var(--amber);color:#1a1204;border-color:var(--amber);
-    padding:13px 22px;font-size:15px;}
+  #overlay button{background:var(--amber);color:#1a1204;border-color:var(--amber);padding:13px 22px;font-size:15px;}
 </style>
 </head>
 <body>
 <div id="app">
   <div id="stage">
     <canvas id="roll"></canvas>
-    <div id="read"><div class="note" id="noteName">—</div><div class="hz" id="hz">esperando voz</div></div>
+    <div id="read">
+      <div class="note" id="noteName">—</div>
+      <div class="hz" id="hz">esperando voz</div>
+      <div id="level"><div id="levelFill"></div></div>
+    </div>
     <div id="cents">
       <div class="row"><span>-50C</span><span>+50C</span></div>
       <div class="track"><div class="mid"></div><div class="dot" id="centsDot"></div></div>
@@ -82,14 +74,14 @@
     <div id="overlay">
       <div class="card">
         <h1>Monitor de tono vocal</h1>
-        <p id="ovText">Canta y mira tu afinación en tiempo real. Necesita acceso al micrófono.
-        Si estás en un archivo local, ábrelo desde <code>http://localhost</code> (ver notas).</p>
+        <p>Canta y mira tu afinación en tiempo real. Toca para dar acceso al micrófono.</p>
         <button id="grant">Activar micrófono</button>
       </div>
     </div>
   </div>
   <div id="bar">
     <button id="start" class="rec">Detener</button>
+    <div id="sensWrap"><span>Sens.</span><input type="range" id="sens" min="1" max="20" step="0.5" value="5"></div>
     <button id="clear">Limpiar</button>
   </div>
 </div>
@@ -97,232 +89,191 @@
 <script>
 (() => {
   "use strict";
-  const canvas = document.getElementById('roll');
-  const ctx = canvas.getContext('2d');
-  const overlay = document.getElementById('overlay');
-  const ovText  = document.getElementById('ovText');
-  const grantBtn= document.getElementById('grant');
-  const startBtn= document.getElementById('start');
-  const clearBtn= document.getElementById('clear');
-  const noteEl  = document.getElementById('noteName');
-  const hzEl    = document.getElementById('hz');
-  const centsDot= document.getElementById('centsDot');
+  const canvas=document.getElementById('roll'), ctx=canvas.getContext('2d');
+  const overlay=document.getElementById('overlay'), grantBtn=document.getElementById('grant');
+  const startBtn=document.getElementById('start'), clearBtn=document.getElementById('clear');
+  const noteEl=document.getElementById('noteName'), hzEl=document.getElementById('hz');
+  const centsDot=document.getElementById('centsDot'), levelFill=document.getElementById('levelFill');
+  const sens=document.getElementById('sens');
 
-  // ---- Config ----
-  const LOW = 36;            // C2
-  const HIGH = 64;           // E4  (rango vocal grave-medio + margen)
-  const WINDOW_S = 6;        // segundos visibles
-  const GUTTER = 62;         // ancho de etiquetas de notas
-  const PLAYHEAD_PAD = 34;   // margen del cabezal a la derecha
-  const RMS_GATE = 0.012;    // umbral de volumen para considerar "voz"
-  const STABLE_MS = 90;      // duración mínima para pintar bloque de nota
-  const NOTES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  const LOW=36, HIGH=64, WINDOW_S=6, GUTTER=62, PLAYHEAD_PAD=34;
+  const RMS_GATE=0.004, STABLE_MS=90;
+  const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
-  let dpr = 1, W = 0, H = 0, rowH = 0;
-  let audioCtx = null, analyser = null, source = null, stream = null, buf = null;
-  let running = false, rafId = 0;
-  const history = [];        // {t, midi|null}
-  let lastCents = 0;
+  let dpr=1,W=0,H=0,rowH=0;
+  let audioCtx=null,analyser=null,source=null,gainNode=null,sink=null,stream=null,buf=null;
+  let running=false,rafId=0,lastCents=0;
+  const history=[];
 
   function resize(){
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const r = canvas.getBoundingClientRect();
-    W = r.width; H = r.height;
-    canvas.width  = Math.round(W * dpr);
-    canvas.height = Math.round(H * dpr);
-    ctx.setTransform(dpr,0,0,dpr,0,0);
-    rowH = H / (HIGH - LOW + 1);
+    dpr=Math.min(window.devicePixelRatio||1,2);
+    const r=canvas.getBoundingClientRect(); W=r.width; H=r.height;
+    canvas.width=Math.round(W*dpr); canvas.height=Math.round(H*dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0); rowH=H/(HIGH-LOW+1);
   }
-  window.addEventListener('resize', resize);
+  window.addEventListener('resize',resize);
 
-  const midiToName = m => NOTES[((m%12)+12)%12] + (Math.floor(m/12) - 1);
-  const yForMidi = m => H - (m - LOW + 0.5) * rowH; // centro de la fila de esa nota
+  const midiToName=m=>NOTES[((m%12)+12)%12]+(Math.floor(m/12)-1);
+  const yForMidi=m=>H-(m-LOW+0.5)*rowH;
 
-  // ---- Detección de tono: autocorrelación (Chris Wilson) ----
-  function autoCorrelate(b, sr){
-    const SIZE = b.length;
-    let rms = 0;
-    for (let i=0;i<SIZE;i++){ const v=b[i]; rms += v*v; }
-    rms = Math.sqrt(rms/SIZE);
-    if (rms < RMS_GATE) return -1;
-
-    let r1=0, r2=SIZE-1; const thres=0.2;
-    for (let i=0;i<SIZE/2;i++){ if (Math.abs(b[i])<thres){ r1=i; break; } }
-    for (let i=1;i<SIZE/2;i++){ if (Math.abs(b[SIZE-i])<thres){ r2=SIZE-i; break; } }
-    const s = b.subarray(r1, r2);
-    const n = s.length;
-    const c = new Float32Array(n);
-    for (let i=0;i<n;i++){ let sum=0; for (let j=0;j<n-i;j++) sum += s[j]*s[j+i]; c[i]=sum; }
-
-    let d=0; while (d < n-1 && c[d] > c[d+1]) d++;
-    let maxval=-1, maxpos=-1;
-    for (let i=d;i<n;i++){ if (c[i]>maxval){ maxval=c[i]; maxpos=i; } }
-    if (maxpos <= 0) return -1;
-
-    let T0 = maxpos;
-    const x1=c[T0-1]||0, x2=c[T0], x3=c[T0+1]||0;
-    const a=(x1+x3-2*x2)/2, bb=(x3-x1)/2;
-    if (a) T0 = T0 - bb/(2*a);
-    const freq = sr / T0;
-    if (freq < 55 || freq > 1200) return -1;   // fuera de rango vocal razonable
-    return freq;
+  function autoCorrelate(b,sr){
+    const SIZE=b.length; let rms=0,peak=0;
+    for(let i=0;i<SIZE;i++){const v=b[i]; rms+=v*v; const a=Math.abs(v); if(a>peak)peak=a;}
+    rms=Math.sqrt(rms/SIZE);
+    if(rms<RMS_GATE) return {f:-1,rms};
+    const thres=Math.max(0.06,peak*0.2);
+    let r1=0,r2=SIZE-1;
+    for(let i=0;i<SIZE/2;i++){if(Math.abs(b[i])<thres){r1=i;break;}}
+    for(let i=1;i<SIZE/2;i++){if(Math.abs(b[SIZE-i])<thres){r2=SIZE-i;break;}}
+    const s=b.subarray(r1,r2), n=s.length;
+    if(n<32) return {f:-1,rms};
+    const c=new Float32Array(n);
+    for(let i=0;i<n;i++){let sum=0; for(let j=0;j<n-i;j++) sum+=s[j]*s[j+i]; c[i]=sum;}
+    let d=0; while(d<n-1&&c[d]>c[d+1]) d++;
+    let maxval=-1,maxpos=-1;
+    for(let i=d;i<n;i++){if(c[i]>maxval){maxval=c[i];maxpos=i;}}
+    if(maxpos<=0) return {f:-1,rms};
+    let T0=maxpos; const x1=c[T0-1]||0,x2=c[T0],x3=c[T0+1]||0;
+    const a=(x1+x3-2*x2)/2,bb=(x3-x1)/2; if(a) T0=T0-bb/(2*a);
+    const f=sr/T0;
+    if(f<55||f>1200) return {f:-1,rms};
+    return {f,rms};
   }
 
-  // ---- Dibujo ----
   function drawGrid(){
     ctx.clearRect(0,0,W,H);
-    for (let m=LOW; m<=HIGH; m++){
-      const y = H - (m - LOW + 1) * rowH;
-      const isBlack = [1,3,6,8,10].includes(((m%12)+12)%12);
-      ctx.fillStyle = isBlack ? 'var(--row-b)' : 'var(--row-a)';
-      ctx.fillStyle = isBlack ? '#1c1e22' : '#26292e';
-      ctx.fillRect(GUTTER, y, W-GUTTER, rowH);
-      ctx.strokeStyle = '#000';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(GUTTER, y+0.5); ctx.lineTo(W, y+0.5); ctx.stroke();
+    for(let m=LOW;m<=HIGH;m++){
+      const y=H-(m-LOW+1)*rowH;
+      const isBlack=[1,3,6,8,10].includes(((m%12)+12)%12);
+      ctx.fillStyle=isBlack?'#1c1e22':'#26292e';
+      ctx.fillRect(GUTTER,y,W-GUTTER,rowH);
+      ctx.strokeStyle='#000'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(GUTTER,y+0.5); ctx.lineTo(W,y+0.5); ctx.stroke();
     }
-    // etiquetas de notas (todas las C y las naturales)
-    ctx.textBaseline = 'middle';
-    for (let m=LOW; m<=HIGH; m++){
-      const pc = ((m%12)+12)%12;
-      const natural = [0,2,4,5,7,9,11].includes(pc);
-      if (!natural) continue;
-      const y = H - (m - LOW + 0.5) * rowH;
-      ctx.fillStyle = '#c9d3df';
-      ctx.fillRect(0, y - rowH/2, GUTTER-2, rowH);
-      ctx.fillStyle = '#111418';
-      ctx.font = `600 ${Math.min(15, rowH*0.62)}px -apple-system,Segoe UI,Roboto,sans-serif`;
-      ctx.fillText(midiToName(m), 8, y);
+    ctx.textBaseline='middle';
+    for(let m=LOW;m<=HIGH;m++){
+      const pc=((m%12)+12)%12;
+      if(![0,2,4,5,7,9,11].includes(pc)) continue;
+      const y=H-(m-LOW+0.5)*rowH;
+      ctx.fillStyle='#c9d3df'; ctx.fillRect(0,y-rowH/2,GUTTER-2,rowH);
+      ctx.fillStyle='#111418';
+      ctx.font=`600 ${Math.min(15,rowH*0.62)}px -apple-system,Segoe UI,Roboto,sans-serif`;
+      ctx.fillText(midiToName(m),8,y);
     }
   }
 
   function draw(){
     drawGrid();
-    const now = performance.now()/1000;
-    const t0 = now - WINDOW_S;
-    const plot = GUTTER;
-    const plotW = (W - PLAYHEAD_PAD) - GUTTER;
-    const xForT = t => plot + ((t - t0)/WINDOW_S) * plotW;
+    const now=performance.now()/1000, t0=now-WINDOW_S;
+    const plot=GUTTER, plotW=(W-PLAYHEAD_PAD)-GUTTER;
+    const xForT=t=>plot+((t-t0)/WINDOW_S)*plotW;
+    while(history.length&&history[0].t<t0-0.2) history.shift();
 
-    // purgar historial viejo
-    while (history.length && history[0].t < t0 - 0.2) history.shift();
-
-    // 1) Bloques ámbar de notas sostenidas
-    ctx.fillStyle = '#e08a1e';
+    ctx.fillStyle='#e08a1e';
     let i=0;
-    while (i < history.length){
-      const h = history[i];
-      if (h.midi === null){ i++; continue; }
-      const note = Math.round(h.midi);
-      let j=i;
-      while (j+1 < history.length && history[j+1].midi!==null &&
-             Math.round(history[j+1].midi)===note) j++;
-      const durMs = (history[j].t - history[i].t)*1000;
-      if (durMs >= STABLE_MS){
-        const x1 = xForT(history[i].t), x2 = xForT(history[j].t);
-        const y  = H - (note - LOW + 1) * rowH;
-        roundRect(x1, y+2, Math.max(6, x2-x1), rowH-4, 3);
-        ctx.fill();
+    while(i<history.length){
+      const h=history[i];
+      if(h.midi===null){i++;continue;}
+      const note=Math.round(h.midi); let j=i;
+      while(j+1<history.length&&history[j+1].midi!==null&&Math.round(history[j+1].midi)===note) j++;
+      if((history[j].t-history[i].t)*1000>=STABLE_MS){
+        const x1=xForT(history[i].t),x2=xForT(history[j].t);
+        const y=H-(note-LOW+1)*rowH;
+        roundRect(x1,y+2,Math.max(6,x2-x1),rowH-4,3); ctx.fill();
       }
-      i = j+1;
+      i=j+1;
     }
 
-    // 2) Línea blanca de tono (se corta en silencios -> sin saltos falsos)
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    let pen = false;
-    for (const h of history){
-      if (h.midi === null){ pen = false; continue; }
-      const x = xForT(h.t), y = yForMidi(h.midi);
-      if (!pen){ ctx.moveTo(x,y); pen=true; } else ctx.lineTo(x,y);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.lineJoin='round';
+    ctx.beginPath(); let pen=false;
+    for(const h of history){
+      if(h.midi===null){pen=false;continue;}
+      const x=xForT(h.t),y=yForMidi(h.midi);
+      if(!pen){ctx.moveTo(x,y);pen=true;} else ctx.lineTo(x,y);
     }
     ctx.stroke();
 
-    // 3) Cabezal
-    const hx = W - PLAYHEAD_PAD;
-    ctx.strokeStyle = 'rgba(255,255,255,.55)';
-    ctx.lineWidth = 1.5;
+    const hx=W-PLAYHEAD_PAD;
+    ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.moveTo(hx,0); ctx.lineTo(hx,H); ctx.stroke();
 
-    rafId = requestAnimationFrame(draw);
+    rafId=requestAnimationFrame(draw);
   }
 
   function roundRect(x,y,w,h,r){
-    r = Math.min(r, w/2, h/2);
-    ctx.beginPath();
-    ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r);
-    ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r);
-    ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+    r=Math.min(r,w/2,h/2);
+    ctx.beginPath(); ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+    ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
   }
 
-  // ---- Bucle de análisis ----
   function analyse(){
-    if (!running) return;
+    if(!running) return;
     analyser.getFloatTimeDomainData(buf);
-    const f = autoCorrelate(buf, audioCtx.sampleRate);
-    const t = performance.now()/1000;
-    if (f > 0){
-      const midi = 69 + 12 * Math.log2(f/440);
-      history.push({t, midi});
-      const nearest = Math.round(midi);
-      const cents = Math.round((midi - nearest)*100);
-      lastCents += (cents - lastCents)*0.5;
-      noteEl.textContent = midiToName(nearest);
-      hzEl.textContent = f.toFixed(1) + ' Hz  ·  ' + (cents>=0?'+':'') + cents + '¢';
-      const clamped = Math.max(-50, Math.min(50, lastCents));
-      centsDot.style.left = (50 + clamped) + '%';
-      centsDot.style.opacity = '1';
-      centsDot.style.background = Math.abs(cents) <= 8 ? 'var(--good)' : 'var(--amber)';
-    } else {
-      history.push({t, midi:null});
-      centsDot.style.opacity = '.25';
-      hzEl.textContent = 'esperando voz';
+    const {f,rms}=autoCorrelate(buf,audioCtx.sampleRate);
+    const t=performance.now()/1000;
+
+    // medidor de nivel (con la ganancia ya aplicada)
+    const lvl=Math.min(100,Math.round(rms*400));
+    levelFill.style.width=lvl+'%';
+    levelFill.style.background = lvl<3 ? '#c0392b' : '#39d353';
+
+    if(f>0){
+      const midi=69+12*Math.log2(f/440);
+      history.push({t,midi});
+      const nearest=Math.round(midi), cents=Math.round((midi-nearest)*100);
+      lastCents+=(cents-lastCents)*0.5;
+      noteEl.textContent=midiToName(nearest);
+      hzEl.textContent=f.toFixed(1)+' Hz · '+(cents>=0?'+':'')+cents+'¢';
+      const cl=Math.max(-50,Math.min(50,lastCents));
+      centsDot.style.left=(50+cl)+'%'; centsDot.style.opacity='1';
+      centsDot.style.background=Math.abs(cents)<=8?'var(--good)':'var(--amber)';
+    }else{
+      history.push({t,midi:null});
+      centsDot.style.opacity='.25';
+      hzEl.textContent = lvl<3 ? 'no llega señal — sube Sens.' : 'hay señal, acércate / afina';
     }
-    setTimeout(analyse, 30); // ~33 Hz de muestreo
+    setTimeout(analyse,30);
   }
 
   async function startMic(){
     try{
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false }
+      audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      await audioCtx.resume();                       // iOS arranca suspendido
+      stream=await navigator.mediaDevices.getUserMedia({
+        audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true}
       });
-      source = audioCtx.createMediaStreamSource(stream);
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 2048;
-      buf = new Float32Array(analyser.fftSize);
-      source.connect(analyser);
+      source=audioCtx.createMediaStreamSource(stream);
+      gainNode=audioCtx.createGain(); gainNode.gain.value=parseFloat(sens.value);
+      analyser=audioCtx.createAnalyser(); analyser.fftSize=2048;
+      buf=new Float32Array(analyser.fftSize);
+      source.connect(gainNode); gainNode.connect(analyser);
+      // sumidero mudo -> destination: iOS necesita el grafo "conectado" para bombear datos
+      sink=audioCtx.createGain(); sink.gain.value=0;
+      analyser.connect(sink); sink.connect(audioCtx.destination);
+      await audioCtx.resume();
       overlay.classList.add('hidden');
-      running = true;
-      startBtn.textContent = 'Detener';
-      startBtn.classList.add('rec');
-      analyse();
-      cancelAnimationFrame(rafId); draw();
+      running=true; startBtn.textContent='Detener'; startBtn.classList.add('rec');
+      analyse(); cancelAnimationFrame(rafId); draw();
     }catch(err){
       overlay.classList.remove('hidden');
-      ovText.innerHTML = 'No se pudo acceder al micrófono (' + (err && err.name || 'error') +
-        ').<br>Da permiso en el navegador. Si es un archivo local, ábrelo vía ' +
-        '<code>http://localhost</code> — mira las notas del chat.';
+      overlay.querySelector('p').innerHTML='No se pudo acceder al micrófono ('+((err&&err.name)||'error')+
+        '). Da permiso en el navegador y vuelve a tocar Activar.';
     }
   }
-
   function stopMic(){
-    running = false;
-    startBtn.textContent = 'Reanudar';
-    startBtn.classList.remove('rec');
-    if (stream) stream.getTracks().forEach(t=>t.stop());
-    if (audioCtx) audioCtx.close();
-    stream = null; audioCtx = null;
+    running=false; startBtn.textContent='Reanudar'; startBtn.classList.remove('rec');
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    if(audioCtx) audioCtx.close();
+    stream=null; audioCtx=null;
   }
 
-  grantBtn.addEventListener('click', startMic);
-  startBtn.addEventListener('click', () => { running ? stopMic() : startMic(); });
-  clearBtn.addEventListener('click', () => { history.length = 0; });
+  sens.addEventListener('input',()=>{ if(gainNode) gainNode.gain.value=parseFloat(sens.value); });
+  grantBtn.addEventListener('click',startMic);
+  startBtn.addEventListener('click',()=>{ running?stopMic():startMic(); });
+  clearBtn.addEventListener('click',()=>{ history.length=0; });
 
-  resize();
-  drawGrid();
+  resize(); drawGrid();
 })();
 </script>
 </body>
