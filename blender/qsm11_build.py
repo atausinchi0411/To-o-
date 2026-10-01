@@ -775,6 +775,16 @@ def build_front():
             a = k * math.pi / 2 + math.pi / 4
             bm_cyl(bm, 7, 7, 12, (FAN[0] + 22, FAN[1] + math.cos(a) * 44.45, FAN[2] + math.sin(a) * 44.45), 'X', 6)
     o = part('cubo_ventilador', STEEL, 'Accesorios', fan); meta(o, 'accesorios', 'Cubo y polea del ventilador (Ø190)', 'C'); objs.append(o)
+    # ventilador del radiador (camión de minería): diámetro ESTIMADO 711 mm, 8 aspas
+    def fanblades(bm):
+        bm_cyl(bm, 70, 70, 30, (0, 0, 0), 'X', 40)
+        for i in range(8):
+            a = 2 * math.pi * i / 8
+            rot = Matrix.Rotation(a, 4, 'X') @ Matrix.Rotation(math.radians(28), 4, 'Z')
+            bm_box(bm, 8, 300, 120, Vector((0, 0, 0)) + Matrix.Rotation(a, 4, 'X').to_3x3() @ Vector((0, 0, 205)),
+                   Matrix.Rotation(a, 4, 'X') @ Matrix.Rotation(math.radians(28), 4, 'Y') @ Matrix.Rotation(math.pi / 2, 4, 'X'))
+    o = part('ventilador', BLACK, 'Accesorios', fanblades, (3, 2)); finish(o); o.location = (FAN[0] + 75, FAN[1], FAN[2])
+    meta(o, 'refrigeracion', 'Ventilador del radiador (Ø711 estimado)', 'E'); objs.append(o)
     # tensor
     TEN = (BELT_X, -95.0, 120.0)
     o = part('tensor', STEEL, 'Accesorios', lambda bm: bm_cyl(bm, 36, 36, 34, TEN, 'X', 32)); meta(o, 'accesorios', 'Tensor de correa', 'E'); objs.append(o)
@@ -865,6 +875,7 @@ def pose(theta):
         p = bpy.data.objects[f'piston_{c}']; p.location = (XC(c), 0, yP)
         r = bpy.data.objects[f'biela_{c}']; r.location = (XC(c), R * s, R * co)
         r.rotation_euler = (math.atan2(R * s, yP - R * co), 0, 0)
+    bpy.data.objects['ventilador'].rotation_euler = (math.radians(-theta * 190.7 / 190), 0, 0)
     for n in ('ciguenal', 'amortiguador_polea', 'volante'):
         bpy.data.objects[n].rotation_euler = (math.radians(-theta), 0, 0)
     bpy.data.objects['arbol_levas'].rotation_euler = (math.radians(-theta / 2), 0, 0)
