@@ -111,6 +111,11 @@ summary{cursor:pointer;font-weight:600}
 #tour h2{font:700 26px/1.05 var(--f-display);margin:6px 0 8px;text-wrap:balance}
 #tour p{margin:0 0 8px;max-width:62ch}
 #panelToggle{display:none}
+#quick{position:fixed;z-index:6;top:calc(env(safe-area-inset-top,0px) + 14px);right:398px;display:flex;flex-direction:column;gap:8px}
+#quick button{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;background:var(--panel);border:1px solid var(--line2);border-radius:6px;font:600 15px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;backdrop-filter:blur(8px)}
+#quick button:hover{border-color:var(--accent)}
+#quick button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#quick svg{width:18px;height:18px;flex-shrink:0}
 
 @media (max-width:900px){
   #brand h1{font-size:24px;white-space:nowrap}
@@ -125,6 +130,9 @@ summary{cursor:pointer;font-weight:600}
   #disc{left:8px;right:8px;max-width:none;bottom:auto;top:calc(env(safe-area-inset-top,0px) + 48px);font-size:10px}
   #tour{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 150px)}
   .cy span{font-size:9.5px}
+  #quick{right:8px;top:calc(env(safe-area-inset-top,0px) + 118px)}
+  #quick button{padding:8px 10px;font-size:13px}
+  #quick button span{display:none}
 }
 @media (prefers-reduced-motion:reduce){#panel{transition:none}}
 </style>
@@ -218,6 +226,12 @@ summary{cursor:pointer;font-weight:600}
   <button class="btn" id="panelToggle">Panel</button>
 </div>
 
+<div id="quick" role="toolbar" aria-label="Acciones rápidas">
+  <button id="qExplode" title="Separar las piezas del motor"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="6" height="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></svg><span>Explosionar</span></button>
+  <button id="qXray" title="Ver a través de las carcasas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg><span>Rayos X</span></button>
+  <button id="qCut" title="Cortar el motor por la mitad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18" stroke-dasharray="3 2"/></svg><span>Corte</span></button>
+  <button id="qTour" title="Recorrido guiado"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5l11 7-11 7z"/></svg><span>Recorrido</span></button>
+</div>
 <div id="tour" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
@@ -892,11 +906,19 @@ function fitK(){const a=camera.aspect; return a<1?1.15/Math.pow(a,.75):(a<1.3?1.
 function flyTo(pos,tgt,ms=900){pos=tgt.clone().add(pos.clone().sub(tgt).multiplyScalar(fitK())); fly={p0:camera.position.clone(),t0:controls.target.clone(),p1:pos,t1:tgt.clone(),s:performance.now(),d:matchMedia('(prefers-reduced-motion: reduce)').matches?1:ms};}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{const v=VIEWS[b.dataset.view]; flyTo(v[0],v[1]);});
 
-$('#explode').oninput=e=>{S.explode=+e.target.value; $('#explodeVal').textContent=S.explode+' %'; applyExplode();};
-$('#secOn').onchange=e=>{S.sec=e.target.checked; applySection(); applyMaterials();};
+let exAnim=null;
+function setExplode(v){S.explode=v; $('#explode').value=v; $('#explodeVal').textContent=Math.round(v)+' %'; applyExplode(); $('#qExplode').classList.toggle('on',v>1);}
+function animExplode(to){exAnim={from:S.explode,to,s:performance.now()};}
+$('#explode').oninput=e=>{exAnim=null; setExplode(+e.target.value);};
+function syncQuick(){$('#qXray').classList.toggle('on',S.xray); $('#qCut').classList.toggle('on',S.sec);}
+$('#qExplode').onclick=()=>{animExplode(S.explode>1?0:80); if(S.explode<=1){const v=VIEWS.iso; flyTo(v[0].clone().multiplyScalar(1.55),v[1].clone().setY(330),1100);} };
+$('#qXray').onclick=()=>{S.xray=!S.xray; $('#xray').checked=S.xray; applyMaterials(); syncQuick();};
+$('#qCut').onclick=()=>{S.sec=!S.sec; $('#secOn').checked=S.sec; if(S.sec){S.axis='z';S.secPos=0;$('#secPos').value=0;document.querySelectorAll('[data-axis]').forEach(x=>x.classList.toggle('on',x.dataset.axis==='z'));applySection(); const v=VIEWS.side; flyTo(v[0],v[1]);} applyMaterials(); syncQuick();};
+$('#qTour').onclick=()=>tourGo(S.tour<0?0:-1);
+$('#secOn').onchange=e=>{S.sec=e.target.checked; applySection(); applyMaterials(); syncQuick();};
 document.querySelectorAll('[data-axis]').forEach(b=>b.onclick=()=>{S.axis=b.dataset.axis; document.querySelectorAll('[data-axis]').forEach(x=>x.classList.toggle('on',x===b)); applySection();});
 $('#secPos').oninput=e=>{S.secPos=+e.target.value; applySection();};
-$('#xray').onchange=e=>{S.xray=e.target.checked; applyMaterials();};
+$('#xray').onchange=e=>{S.xray=e.target.checked; applyMaterials(); syncQuick();};
 $('#lbls').onchange=e=>{S.labels=e.target.checked;};
 $('#parts').onchange=e=>{S.particles=e.target.checked; applyVisibility();};
 $('#pspeed').oninput=e=>{S.pspeed=+e.target.value/100;};
@@ -1007,7 +1029,7 @@ function tourGo(i){
   $('#tPrev').onclick=()=>tourGo(i-1); $('#tNext').onclick=()=>tourGo(i===TOUR.length-1?-1:i+1); $('#tExit').onclick=()=>tourGo(-1);
   setSys(s.sys); S.xray=!!s.x; $('#xray').checked=S.xray;
   S.sec=!!s.sec; $('#secOn').checked=S.sec; if(s.sec){S.axis='z';S.secPos=0;$('#secPos').value=0;document.querySelectorAll('[data-axis]').forEach(x=>x.classList.toggle('on',x.dataset.axis==='z'));applySection();}
-  applyMaterials(); S.explode=s.e; $('#explode').value=s.e; $('#explodeVal').textContent=s.e+' %'; applyExplode();
+  applyMaterials(); syncQuick(); animExplode(s.e);
   if(s.slow){S.rpm=6;$('#speed').value=6;$('#rpm').textContent=6;} else if(S.rpm<10){S.rpm=20;$('#speed').value=20;$('#rpm').textContent=20;}
   setPlay(true);
   const v=s.cam||VIEWS[s.v]; flyTo(v[0],v[1],1200);
@@ -1079,6 +1101,7 @@ function loop(now){
   const dt=Math.max(0,Math.min(.05,(now-last)/1000)); last=now;
   if(S.playing){S.theta+=S.rpm*6*dt; if(S.theta>=720)S.theta-=720;}
   if(fly){const t=Math.min(1,(now-fly.s)/fly.d), e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2; camera.position.lerpVectors(fly.p0,fly.p1,e); controls.target.lerpVectors(fly.t0,fly.t1,e); if(t>=1)fly=null;}
+  if(exAnim){const t=Math.min(1,(now-exAnim.s)/1100), e=1-Math.pow(1-t,3); setExplode(exAnim.from+(exAnim.to-exAnim.from)*e); if(t>=1)exAnim=null;}
   controls.update();
   kinematics();
   const flowSpeed=(S.playing?Math.max(.25,S.rpm/20):0.08)*S.pspeed;
