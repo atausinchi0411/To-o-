@@ -1,0 +1,1105 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>QSM11 Visor 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: visor a pantalla completa (taller nocturno), panel técnico a la derecha, barra de animación abajo. En móvil el panel es una hoja inferior. */
+:root{
+  --bg:#0e1217; --bg2:#151b22; --panel:rgba(18,23,30,.94); --line:#2a3440; --line2:#384452;
+  --fg:#e6eaef; --muted:#8e9aa7; --accent:#d4b06a; --accent-ink:#1a1408;
+  --ok:#4cc38a; --est:#f0903a; --sim:#5b9be6; --unk:#8a949e;
+  --fuel:#ff8a2a; --oil:#f2d23c; --cool:#3d8bff; --sea:#2346a8; --air:#4fe3f0; --exh:#ff4a3d; --comp:#c9b6ff;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"IBM Plex Sans","Segoe UI",Roboto,Arial,sans-serif;
+  --f-mono:"IBM Plex Mono",Consolas,"Courier New",monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--f-body);overflow:hidden}
+#stage{position:fixed;inset:0;background:radial-gradient(120% 90% at 40% 35%,#1c2530 0%,#11161c 55%,#0b0e12 100%)}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* Cabecera */
+#brand{position:fixed;top:calc(env(safe-area-inset-top,0px) + 14px);left:16px;z-index:5;pointer-events:none;max-width:min(52vw,520px)}
+#brand h1{margin:0;font:700 44px/0.9 var(--f-display);letter-spacing:.02em}
+#brand h1 span{color:var(--accent)}
+#brand p{margin:6px 0 0;color:var(--muted);font-size:13px}
+.badge{display:inline-flex;gap:6px;align-items:center;margin-top:8px;padding:3px 8px;border:1px solid var(--est);color:var(--est);border-radius:3px;font:600 11px/1.3 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;pointer-events:auto;background:rgba(14,18,23,.6)}
+
+/* Etiquetas 3D */
+#labels{position:fixed;inset:0;pointer-events:none;z-index:3}
+.lbl{position:absolute;transform:translate(-50%,-50%);font:600 12px/1 var(--f-display);letter-spacing:.12em;color:var(--fg);background:rgba(10,13,17,.72);border:1px solid var(--line2);padding:4px 7px;border-radius:2px;white-space:nowrap}
+.lbl.cyl{font:700 15px/1 var(--f-mono);color:var(--accent);border-color:rgba(212,176,106,.5);padding:3px 6px}
+.lbl.dir-front{color:#9fe0b8}.lbl.dir-rear{color:#c3c9d0}.lbl.dir-in{color:var(--air)}.lbl.dir-ex{color:#ff8a7e}
+#tip{position:fixed;z-index:6;pointer-events:none;background:rgba(10,13,17,.9);border:1px solid var(--line2);padding:5px 8px;font-size:12px;border-radius:3px;display:none;white-space:nowrap}
+
+/* Panel lateral */
+#panel{position:fixed;z-index:7;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 120px);width:372px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(8px);min-height:0}
+#tabs{display:flex;border-bottom:1px solid var(--line);flex-shrink:0;overflow-x:auto}
+#tabs button{flex:1;background:none;border:0;padding:11px 6px 9px;color:var(--muted);font:600 14px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;border-bottom:2px solid transparent;white-space:nowrap}
+#tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
+.tabpane{padding:14px 16px 18px;overflow-y:auto;min-height:0;flex:1}
+.tabpane h2{font:700 22px/1.05 var(--f-display);letter-spacing:.02em;margin:0 0 4px;text-wrap:balance}
+.tabpane h3{font:600 13px/1.2 var(--f-display);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
+.en{color:var(--muted);font-style:italic}
+.small{font-size:12px;color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{background:var(--bg2);border:1px solid var(--line2);border-radius:4px;padding:8px 11px;font-weight:500;min-height:38px}
+.btn:hover{border-color:var(--accent)}
+.btn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+label.sw{display:flex;align-items:center;gap:10px;padding:7px 2px;border-bottom:1px solid rgba(42,52,64,.6);cursor:pointer}
+label.sw input{width:18px;height:18px;accent-color:var(--accent)}
+.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+.kv dt{color:var(--muted)}.kv dd{margin:0;font-family:var(--f-mono);font-size:12.5px}
+.pill{display:inline-block;padding:2px 7px;border-radius:10px;font:600 11px/1.4 var(--f-mono);letter-spacing:.04em;text-transform:uppercase;border:1px solid currentColor}
+.st-ver{color:var(--ok)}.st-est{color:var(--est)}.st-sim{color:var(--sim)}.st-unk{color:var(--unk)}
+.note{border-left:3px solid var(--sim);padding:8px 10px;background:rgba(91,155,230,.08);font-size:12.5px;margin:10px 0;color:#c9d6e6}
+.note.warn{border-left-color:var(--est);background:rgba(240,144,58,.08);color:#ecd6c2}
+ul.clean{list-style:none;padding:0;margin:6px 0}
+ul.clean li{padding:3px 0}
+.partlist button{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid rgba(42,52,64,.5);padding:7px 2px;color:var(--fg);font-size:13px}
+.partlist button:hover{color:var(--accent)}
+.tblwrap{overflow-x:auto;margin:6px 0}
+table{border-collapse:collapse;font-size:12px;min-width:560px}
+th,td{border-bottom:1px solid var(--line);padding:6px 6px;text-align:left;vertical-align:top}
+th{font:600 11px/1.2 var(--f-display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+td.num{font-family:var(--f-mono);white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;margin:6px 0}
+details{border-top:1px solid var(--line);padding:8px 0}
+summary{cursor:pointer;font-weight:600}
+
+/* Barra de animación */
+#transport{position:fixed;z-index:8;left:12px;right:396px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;backdrop-filter:blur(8px)}
+#transport .grp{display:flex;gap:6px;align-items:center}
+#transport .btn{min-width:42px;padding:7px 10px}
+#angle{font:500 28px/1 var(--f-mono);font-variant-numeric:tabular-nums;min-width:4.2ch;text-align:right}
+#angle small{font-size:13px;color:var(--muted)}
+.lab{font:600 11px/1.1 var(--f-display);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+#speedwrap{display:flex;flex-direction:column;gap:2px;min-width:150px;flex:1;max-width:240px}
+#cyls{display:flex;gap:5px;flex:2;min-width:300px}
+.cy{flex:1;min-width:0;border:1px solid var(--line2);border-radius:4px;padding:5px 6px 6px;background:var(--bg2);position:relative;overflow:hidden}
+.cy b{font:700 15px/1 var(--f-mono)}
+.cy span{display:block;font:600 10.5px/1.15 var(--f-display);letter-spacing:.06em;text-transform:uppercase;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cy i{position:absolute;left:0;bottom:0;height:3px;background:currentColor;opacity:.9}
+.ph-adm{color:var(--air)}.ph-com{color:#9fb6ff}.ph-exp{color:#ffb347}.ph-esc{color:#ff7a6e}
+.cy.fire{box-shadow:inset 0 0 0 1px #ffb347,0 0 18px rgba(255,150,40,.35)}
+#fo{font:500 12px/1 var(--f-mono);color:var(--muted)}
+#fo em{font-style:normal;color:var(--fg);padding:2px 3px;border-radius:2px}
+#fo em.now{background:#ffb347;color:#1a1005}
+
+/* Disclaimer permanente */
+#disc{position:fixed;z-index:4;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 118px);max-width:min(560px,calc(100vw - 420px));font-size:11px;line-height:1.35;color:#a9b3bd;background:rgba(10,13,17,.62);border:1px solid var(--line);border-radius:4px;padding:6px 9px}
+#disc b{color:var(--est);letter-spacing:.06em}
+
+/* Recorrido */
+#tour{position:fixed;z-index:9;left:16px;top:calc(env(safe-area-inset-top,0px) + 120px);width:min(400px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--accent);border-radius:6px;padding:14px 16px;box-shadow:0 10px 40px rgba(0,0,0,.5)}
+#tour .step{font:600 12px/1 var(--f-mono);color:var(--accent);letter-spacing:.08em}
+#tour h2{font:700 26px/1.05 var(--f-display);margin:6px 0 8px;text-wrap:balance}
+#tour p{margin:0 0 8px;max-width:62ch}
+#panelToggle{display:none}
+
+@media (max-width:900px){
+  #brand h1{font-size:24px;white-space:nowrap}
+  #brand p,#brand .badge{display:none}
+  #panel{left:0;right:0;width:auto;top:auto;bottom:0;height:52vh;border-radius:10px 10px 0 0;transform:translateY(calc(100% + 2px));transition:transform .25s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
+  #panel.open{transform:none}
+  #transport{left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);gap:8px;padding:8px}
+  #panel.open ~ #transport{bottom:calc(52vh + 8px)}
+  #cyls{order:5;min-width:100%}
+  #speedwrap{min-width:110px}
+  #panelToggle{display:inline-flex}
+  #disc{left:8px;right:8px;max-width:none;bottom:auto;top:calc(env(safe-area-inset-top,0px) + 48px);font-size:10px}
+  #tour{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 150px)}
+  .cy span{font-size:9.5px}
+}
+@media (prefers-reduced-motion:reduce){#panel{transition:none}}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div id="labels"></div>
+<div id="tip"></div>
+
+<header id="brand">
+  <h1>QSM<span>11</span> · Visor 3D</h1>
+  <p>Diésel 4 tiempos · 6 cilindros en línea · 10,8 L · Orden 1-5-3-6-2-4</p>
+  <span class="badge" title="Ver pestaña Datos">Modelo didáctico</span>
+</header>
+
+<div id="disc"><b>MODELO DIDÁCTICO.</b> Representación con fines educativos y de visualización. No es un plano de fabricación, modelo CAD certificado ni documentación oficial de Cummins. Lo no documentado está estimado o simplificado (nota completa en la pestaña Datos).</div>
+
+<aside id="panel" aria-label="Panel de información">
+  <nav id="tabs" role="tablist">
+    <button role="tab" data-tab="pieza" aria-selected="true">Pieza</button>
+    <button role="tab" data-tab="vista" aria-selected="false">Vista</button>
+    <button role="tab" data-tab="sistemas" aria-selected="false">Sistemas</button>
+    <button role="tab" data-tab="datos" aria-selected="false">Datos</button>
+    <button role="tab" data-tab="aprender" aria-selected="false">Aprender</button>
+  </nav>
+
+  <section class="tabpane" id="tab-pieza"></section>
+
+  <section class="tabpane" id="tab-vista" hidden>
+    <h3>Cámara</h3>
+    <div class="grid3">
+      <button class="btn" data-view="front">Frontal</button>
+      <button class="btn" data-view="side">Lateral</button>
+      <button class="btn" data-view="top">Superior</button>
+      <button class="btn" data-view="iso">Isométrica</button>
+      <button class="btn" data-view="rear">Posterior</button>
+      <button class="btn" data-view="reset">Reset</button>
+    </div>
+    <p class="small">Frontal = desde el extremo del cilindro 1. Arrastra para girar, rueda o pellizco para zoom, clic derecho o dos dedos para desplazar.</p>
+
+    <h3>Vista explosionada</h3>
+    <input type="range" id="explode" min="0" max="100" value="0" aria-label="Separación de la vista explosionada">
+    <div class="row small"><span>Ensamblado</span><span style="margin-left:auto" id="explodeVal">0 %</span></div>
+    <p class="small">Con el motor separado se ocultan los flujos de fluidos (sus rutas solo tienen sentido ensamblado).</p>
+
+    <h3>Corte transversal</h3>
+    <label class="sw"><input type="checkbox" id="secOn"> Activar plano de corte</label>
+    <div class="grid3" style="margin:8px 0">
+      <button class="btn on" data-axis="z">Eje Z</button>
+      <button class="btn" data-axis="x">Eje X</button>
+      <button class="btn" data-axis="y">Eje Y</button>
+    </div>
+    <input type="range" id="secPos" min="-100" max="100" value="0" aria-label="Posición del plano de corte">
+    <p class="small">Eje Z corta a lo largo del motor (ves los 6 cilindros). Eje X corta un cilindro de lado.</p>
+
+    <h3>Visualización</h3>
+    <label class="sw"><input type="checkbox" id="xray"> Modo rayos X (carcasas transparentes)</label>
+    <label class="sw"><input type="checkbox" id="lbls" checked> Etiquetas (frente, admisión, cilindros)</label>
+    <label class="sw"><input type="checkbox" id="parts" checked> Partículas de fluidos</label>
+    <div style="margin-top:8px"><span class="lab">Velocidad visual de partículas</span><input type="range" id="pspeed" min="10" max="300" value="100" aria-label="Velocidad de partículas"></div>
+    <div class="note">Las partículas son una representación didáctica. Su velocidad y densidad no representan valores reales de caudal.</div>
+  </section>
+
+  <section class="tabpane" id="tab-sistemas" hidden>
+    <div class="row"><button class="btn primary" id="showAll">Mostrar todo</button><button class="btn" id="onlyCore">Solo núcleo móvil</button></div>
+    <div id="syslist" style="margin-top:8px"></div>
+    <div class="note">Las rutas de tuberías siguen la lógica de los diagramas de flujo del manual (págs. 196–220), pero su trazado en 3D es esquemático.</div>
+  </section>
+
+  <section class="tabpane" id="tab-datos" hidden></section>
+  <section class="tabpane" id="tab-aprender" hidden></section>
+</aside>
+
+<div id="transport" role="group" aria-label="Animación">
+  <div class="grp">
+    <button class="btn primary" id="play" aria-label="Reproducir o pausar">❚❚</button>
+    <button class="btn" id="rst" aria-label="Volver a 0 grados">↺</button>
+    <button class="btn" id="m1" aria-label="Retroceder 1 grado">−1°</button>
+    <button class="btn" id="p1" aria-label="Avanzar 1 grado">+1°</button>
+  </div>
+  <div>
+    <div class="lab">Ángulo cigüeñal</div>
+    <div id="angle">000<small>°/720</small></div>
+  </div>
+  <div id="speedwrap">
+    <div class="lab">Velocidad · <span id="rpm">20</span> rpm de animación</div>
+    <input type="range" id="speed" min="1" max="120" value="20" aria-label="Velocidad de animación">
+    <div id="fo">Orden: <em>1</em> <em>5</em> <em>3</em> <em>6</em> <em>2</em> <em>4</em></div>
+  </div>
+  <div id="cyls"></div>
+  <button class="btn" id="panelToggle">Panel</button>
+</div>
+
+<div id="tour" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/environments/RoomEnvironment.js"></script>
+<script>
+(function(){
+'use strict';
+if(!window.THREE){
+  document.getElementById('stage').innerHTML='<div style="padding:120px 24px;max-width:560px;color:#e6eaef;font:15px/1.5 sans-serif">No se pudo cargar Three.js desde Internet (cdn.jsdelivr.net). Este visor necesita conexión la primera vez que se abre. Revisa tu conexión o un bloqueador de contenido y recarga la página.</div>';
+  return;
+}
+const T=THREE, D2R=Math.PI/180;
+
+/* ================= DATOS ================= */
+const BORE=125, STROKE=147, R=STROKE/2;          // verificados (pág. 361)
+const L0=260;                                     // longitud de biela de referencia (ESTIMADA)
+let L=L0;
+const PITCH=150;                                  // distancia entre cilindros (ESTIMADA)
+const CH=80, PH=120;                              // altura de compresión / altura pistón (ESTIMADAS)
+const DECK=425, HEAD_TOP=545, COVER_TOP=640;
+const LIFT=14;                                    // alzada de válvula (ESTIMADA)
+const FIRING=[1,5,3,6,2,4];
+const PHI={}; FIRING.forEach((c,k)=>PHI[c]=k*120); // TDC de compresión de cada cilindro (720/6 = 120°)
+const XC=c=>(3.5-c)*PITCH;                        // cilindro 1 al frente (+X)
+
+/* ================= RENDER ================= */
+const stage=document.getElementById('stage');
+const renderer=new T.WebGLRenderer({antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.outputEncoding=T.sRGBEncoding;
+renderer.toneMapping=T.ACESFilmicToneMapping;
+renderer.toneMappingExposure=.95;
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=T.PCFSoftShadowMap;
+renderer.localClippingEnabled=true;
+renderer.autoClear=false;
+stage.appendChild(renderer.domElement);
+
+const scene=new T.Scene();
+const pmrem=new T.PMREMGenerator(renderer);
+if(T.RoomEnvironment){scene.environment=pmrem.fromScene(new T.RoomEnvironment(),0.04).texture;}
+
+const camera=new T.PerspectiveCamera(36,1,5,30000);
+const controls=new T.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=0.08;
+controls.minDistance=400; controls.maxDistance=7000;
+controls.target.set(0,240,0);
+
+scene.add(new T.HemisphereLight(0xcfe3ff,0x2a2016,0.4));
+const sun=new T.DirectionalLight(0xfff4e6,1.9);
+sun.position.set(1600,2600,1400); sun.castShadow=true;
+const small=window.innerWidth<900;
+sun.shadow.mapSize.set(small?1024:2048,small?1024:2048);
+Object.assign(sun.shadow.camera,{left:-1400,right:1400,top:1400,bottom:-1400,near:500,far:6000});
+sun.shadow.bias=-0.0004;
+scene.add(sun);
+const rim=new T.DirectionalLight(0x8fb8ff,0.55); rim.position.set(-2000,900,-1800); scene.add(rim);
+
+// Suelo con sombra + rejilla polar
+const FLOOR=-460;
+const ground=new T.Mesh(new T.CircleGeometry(2600,64),new T.ShadowMaterial({opacity:0.35}));
+ground.rotation.x=-Math.PI/2; ground.position.y=FLOOR; ground.receiveShadow=true; scene.add(ground);
+const polar=new T.PolarGridHelper(1800,12,6,72,0x3a4756,0x222b35);
+polar.position.y=FLOOR+1; polar.material.transparent=true; polar.material.opacity=0.55; scene.add(polar);
+
+/* ================= MATERIALES ================= */
+const BASE={
+  paint:  new T.MeshStandardMaterial({color:0x33404c,roughness:.62,metalness:.15,envMapIntensity:.55}),
+  paint2: new T.MeshStandardMaterial({color:0x3d4b59,roughness:.55,metalness:.2,envMapIntensity:.6}),
+  alu:    new T.MeshStandardMaterial({color:0x9aa3ab,roughness:.42,metalness:.75,envMapIntensity:.8}),
+  steel:  new T.MeshStandardMaterial({color:0xc8cdd2,roughness:.22,metalness:1}),
+  iron:   new T.MeshStandardMaterial({color:0x3b3f45,roughness:.55,metalness:.75}),
+  brass:  new T.MeshStandardMaterial({color:0xcaa35a,roughness:.3,metalness:.95}),
+  black:  new T.MeshStandardMaterial({color:0x1f2328,roughness:.55,metalness:.3}),
+  rubber: new T.MeshStandardMaterial({color:0x16181b,roughness:.9,metalness:0}),
+  hot:    new T.MeshStandardMaterial({color:0x6a5246,roughness:.5,metalness:.75}),
+  red:    new T.MeshStandardMaterial({color:0xa8352c,roughness:.45,metalness:.3}),
+  liner:  new T.MeshStandardMaterial({color:0x7d858d,roughness:.3,metalness:.9}),
+  copper: new T.MeshStandardMaterial({color:0xb87333,roughness:.35,metalness:.95}),
+};
+for(const k in BASE){BASE[k].side=T.DoubleSide; BASE[k].envMapIntensity=(BASE[k].envMapIntensity||1)*.45;}
+const allMats=[];
+
+/* ================= PIEZAS ================= */
+const parts={}, PI_={}, pickables=[];
+const G={}; // grupos de ensamblaje (para la vista explosionada)
+function group(name,ex){const g=new T.Group();g.userData.ex=new T.Vector3(...ex);g.name=name;scene.add(g);G[name]=g;return g;}
+function part(id,info,parent,opt={}){
+  const g=new T.Group(); g.userData={partId:id,mats:{},shell:!!opt.shell,sys:info.sys};
+  parent.add(g); parts[id]=g; PI_[id]=info; return g;
+}
+function mat(p,kind){
+  let m=p.userData.mats[kind];
+  if(!m){m=BASE[kind].clone(); m.userData={shell:p.userData.shell,baseOpacity:1}; p.userData.mats[kind]=m; allMats.push(m);}
+  return m;
+}
+function mesh(p,geo,kind,x=0,y=0,z=0,shadow=true){
+  const m=new T.Mesh(geo,mat(p,kind)); m.position.set(x,y,z);
+  m.castShadow=shadow; m.receiveShadow=true; m.userData.part=p; p.add(m); pickables.push(m); return m;
+}
+const box=(w,h,d)=>new T.BoxGeometry(w,h,d);
+function cylG(r1,r2,h,axis='y',seg=32,open=false,th0=0,thL=Math.PI*2){
+  const g=new T.CylinderGeometry(r1,r2,h,seg,1,open,th0,thL);
+  if(axis==='x')g.rotateZ(-Math.PI/2); if(axis==='z')g.rotateX(Math.PI/2); return g;
+}
+function rbox(w,h,d,r){ // caja redondeada: perfil en YZ extruido en X
+  const s=new T.Shape(), hw=d/2, hh=h/2; r=Math.min(r,hw,hh);
+  s.moveTo(-hw+r,-hh); s.lineTo(hw-r,-hh); s.quadraticCurveTo(hw,-hh,hw,-hh+r); s.lineTo(hw,hh-r); s.quadraticCurveTo(hw,hh,hw-r,hh);
+  s.lineTo(-hw+r,hh); s.quadraticCurveTo(-hw,hh,-hw,hh-r); s.lineTo(-hw,-hh+r); s.quadraticCurveTo(-hw,-hh,-hw+r,-hh);
+  const g=new T.ExtrudeGeometry(s,{depth:w,bevelEnabled:true,bevelThickness:r*.6,bevelSize:r*.6,bevelSegments:3,curveSegments:6});
+  g.translate(0,0,-w/2); g.rotateY(Math.PI/2); return g;
+}
+
+const SRC='Cummins QSM11 Operation and Maintenance Manual, Bulletin 3666';
+const EST='Estimación de ingeniería; no documentado en Bulletin 3666.';
+
+/* --- grupos de ensamblaje: [dirección de separación en mm al 100 %] --- */
+group('cover',[0,900,0]); group('head',[0,560,0]); group('valvetrain',[0,740,0]); group('push',[0,320,0]);
+group('block',[0,0,0]); group('pistons',[0,260,0]); group('crankG',[0,-420,0]); group('cam',[0,-60,-420]);
+group('pan',[0,-760,0]); group('intake',[0,80,-620]); group('exhaust',[0,80,620]); group('turbo',[-200,380,620]);
+group('front',[700,0,0]); group('rear',[-700,0,0]); group('top',[0,1100,0]);
+const crankRot=new T.Group(); G.crankG.add(crankRot);
+
+/* ---------- ESTRUCTURA ---------- */
+{
+  const p=part('block',{es:'Bloque motor',en:'Engine block',sys:'estructura',st:'sim',page:'25–39 (vistas)',
+    fn:'Estructura principal. Aloja los 6 cilindros, el cigüeñal, el árbol de levas y las camisas de agua y galerías de aceite.',
+    ver:['6 cilindros en línea','Calibre 125 mm (alojamiento de cada cilindro)'],est:['Longitud, ancho y alto del bloque','Forma exterior simplificada a volúmenes']},G.block,{shell:true});
+  mesh(p,box(1020,DECK-150,300),'paint',0,(DECK+150)/2,0);
+  mesh(p,box(1020,260,370),'paint',0,20,0);
+  mesh(p,box(1000,40,340),'paint',0,140,0);
+  for(let i=0;i<7;i++){const x=-450+i*150; for(const s of[-1,1]) mesh(p,box(26,230,22),'paint2',x,40,s*192);}   // nervios
+  for(let c=1;c<=6;c++){ for(const s of[-1,1]){ const m=mesh(p,cylG(22,22,8,'z',24),'steel',XC(c),300,s*152);} } // tapones
+}
+{
+  const p=part('liners',{es:'Cilindros (camisas)',en:'Cylinder liners',sys:'estructura',st:'ver',page:'361',
+    fn:'Superficie por la que se desliza cada pistón. Forman la cámara donde ocurre el ciclo de 4 tiempos.',
+    ver:['Diámetro (calibre) 125 mm','Carrera del pistón 147 mm','6 cilindros, el n.º 1 al frente'],est:['Espesor y longitud de la camisa']},G.block,{shell:true});
+  for(let c=1;c<=6;c++){ mesh(p,cylG(64,64,DECK-150,'y',40,true),'liner',XC(c),(DECK+150)/2,0,false); }
+}
+{
+  const p=part('head',{es:'Culata',en:'Cylinder head',sys:'estructura',st:'sim',page:'25–39',
+    fn:'Cierra los cilindros por arriba. Contiene las 24 válvulas, los conductos de admisión y escape y los inyectores.',
+    ver:['4 válvulas por cilindro (24 en total)'],est:['Dimensiones y forma de la culata','Forma de los conductos internos']},G.head,{shell:true});
+  mesh(p,box(1000,HEAD_TOP-DECK,320),'paint2',0,(DECK+HEAD_TOP)/2,0);
+  mesh(p,box(1010,10,330),'iron',0,DECK+5,0);
+  for(let i=0;i<14;i++){ for(const s of[-1,1]) mesh(p,cylG(10,10,14,'y',12),'steel',-487+i*75,HEAD_TOP+7,s*140); }
+}
+{
+  const p=part('cover',{es:'Tapa de balancines',en:'Rocker housing / valve cover',sys:'estructura',st:'sim',page:'25 (ubicación de la placa de datos)',
+    fn:'Protege el tren de válvulas y retiene el aceite que lo lubrica. Según el manual, la placa de datos del motor marino está sobre la carcasa de balancines.',
+    ver:[],est:['Forma redondeada y altura']},G.cover,{shell:true});
+  mesh(p,rbox(960,COVER_TOP-HEAD_TOP,290,26),'alu',0,(HEAD_TOP+COVER_TOP)/2,0);
+  mesh(p,box(160,4,70),'brass',-100,COVER_TOP+8,0);
+}
+{
+  const p=part('pan',{es:'Cárter de aceite',en:'Oil pan',sys:'estructura',st:'sim',page:'33 (vista babor)',
+    fn:'Depósito inferior del aceite lubricante. La bomba de aceite aspira desde aquí.',ver:[],est:['Forma y capacidad visual']},G.pan,{shell:true});
+  mesh(p,box(1000,30,380),'iron',0,-120,0);
+  mesh(p,box(980,120,360),'paint',0,-195,0);
+  mesh(p,box(460,130,330),'paint',150,-315,0);
+  mesh(p,cylG(9,9,330,'y',12),'brass',-200,-60,-205);
+}
+{
+  const p=part('gearcover',{es:'Tapa de engranajes delantera',en:'Front gear cover',sys:'estructura',st:'sim',page:'31',
+    fn:'Cubre los engranajes de distribución que sincronizan el cigüeñal con el árbol de levas (este a la mitad de vueltas).',ver:[],est:['Forma simplificada']},G.front,{shell:true});
+  mesh(p,box(50,560,360),'alu',535,180,0);
+}
+{
+  const p=part('fwhousing',{es:'Carcasa del volante',en:'Flywheel housing',sys:'estructura',st:'sim',page:'35',
+    fn:'Envuelve el volante de inercia y sirve de brida para acoplar la transmisión o la reductora marina.',ver:[],est:['Diámetro y forma']},G.rear,{shell:true});
+  mesh(p,cylG(330,300,110,'x',48,true),'paint',-570,10,0);
+  mesh(p,cylG(330,330,14,'x',48),'paint2',-626,10,0);
+}
+{
+  const p=part('mounts',{es:'Soportes del motor',en:'Engine mounts',sys:'estructura',st:'est',page:'32',
+    fn:'Fijan el motor a la bancada o al casco y reducen la transmisión de vibraciones.',ver:[],est:['Posición y forma']},G.block);
+  for(const x of[420,-420]) for(const s of[-1,1]){ mesh(p,box(90,60,170),'iron',x,-40,s*265); mesh(p,box(140,22,120),'rubber',x,-82,s*300); }
+}
+
+/* ---------- CIGÜEÑAL, VOLANTE, AMORTIGUADOR ---------- */
+const throws=[];
+{
+  const p=part('crank',{es:'Cigüeñal',en:'Crankshaft',sys:'cigueñal',st:'sim',page:'361 (giro y orden)',
+    fn:'Convierte el movimiento de subida y bajada de los pistones en giro. Gira en sentido horario visto desde el frente.',
+    ver:['Radio de manivela 73,5 mm (carrera 147 / 2)','Giro horario visto desde el frente','Orden de encendido 1-5-3-6-2-4'],
+    est:['Muñequillas por pares 1-6, 2-5, 3-4 a 0°/120°/240° (configuración estándar de 6 en línea, deducida)','Diámetros de apoyos y muñequillas, forma de contrapesos']},crankRot);
+  for(let i=0;i<=6;i++){ const x=(3-i)*PITCH; mesh(p,cylG(44,44,52,'x',28),'steel',x,0,0); }
+  mesh(p,cylG(36,36,120,'x',24),'steel',590,0,0);
+  for(let c=1;c<=6;c++){
+    const tg=new T.Group(); tg.position.x=XC(c); tg.rotation.x=PHI[c]*D2R; p.add(tg);
+    const pin=new T.Mesh(cylG(38,38,46,'x',24),mat(p,'steel')); pin.position.y=R; pin.castShadow=true; pin.userData.part=p; tg.add(pin); pickables.push(pin);
+    for(const s of[-1,1]){
+      const web=new T.Mesh(box(22,R+70,100),mat(p,'iron')); web.position.set(s*34,R/2-10,0); web.castShadow=true; web.userData.part=p; tg.add(web); pickables.push(web);
+      const cw=new T.Mesh(cylG(98,98,22,'x',28,false,Math.PI/2,Math.PI),mat(p,'iron')); cw.position.set(s*34,-8,0); cw.castShadow=true; cw.userData.part=p; tg.add(cw); pickables.push(cw);
+    }
+    throws.push(tg);
+  }
+}
+{
+  const p=part('damper',{es:'Amortiguador de vibraciones',en:'Vibration damper',sys:'cigueñal',st:'sim',page:'31',
+    fn:'Disco en la punta delantera del cigüeñal que absorbe las vibraciones de torsión.',ver:[],est:['Diámetro y espesor']},crankRot);
+  mesh(p,cylG(150,150,56,'x',48),'iron',640,0,0);
+  mesh(p,cylG(120,120,60,'x',48),'steel',640,0,0);
+  for(let i=0;i<6;i++){ const a=i/6*Math.PI*2; mesh(p,cylG(9,9,64,'x',10),'brass',640,Math.cos(a)*80,Math.sin(a)*80); }
+  mesh(p,cylG(108,108,40,'x',48),'black',695,0,0);
+}
+{
+  const p=part('flywheel',{es:'Volante de inercia',en:'Flywheel',sys:'cigueñal',st:'sim',page:'35',
+    fn:'Masa que almacena energía y suaviza el giro entre combustiones. Su corona dentada engrana con el motor de arranque.',ver:[],est:['Diámetro y espesor']},crankRot);
+  mesh(p,cylG(270,270,46,'x',64),'steel',-535,0,0);
+  mesh(p,cylG(285,285,24,'x',96),'iron',-548,0,0);
+  for(let i=0;i<8;i++){ const a=i/8*Math.PI*2; mesh(p,cylG(14,14,50,'x',10),'brass',-532,Math.cos(a)*170,Math.sin(a)*170); }
+  mesh(p,box(30,90,20),'red',-512,200,0);
+}
+
+/* ---------- PISTONES Y BIELAS ---------- */
+const pistons={}, rods={}, gas={}, spray={};
+const rodShaftGeo=box(26,1,44);
+for(let c=1;c<=6;c++){
+  const pp=part('piston'+c,{es:'Pistón del cilindro '+c,en:'Cylinder '+c+' piston',sys:'moviles',cyl:c,st:'ver',page:'361',
+    fn:'Recibe la presión de la combustión y la transmite a la biela. Sube y baja 147 mm en cada media vuelta del cigüeñal.',
+    ver:['Diámetro de referencia 125 mm (calibre)','Carrera 147 mm'],est:['Altura del pistón (120 mm)','Altura de compresión (80 mm)','Forma de la corona y posición de los segmentos']},G.pistons);
+  const pg=new T.Group(); pp.add(pg);
+  const add=(geo,k,y)=>{const m=new T.Mesh(geo,mat(pp,k)); m.position.y=y; m.castShadow=true; m.userData.part=pp; pg.add(m); pickables.push(m); return m;};
+  add(cylG(62,62,PH,'y',40),'alu',CH-PH/2);
+  for(let k=0;k<3;k++) add(cylG(62.6,62.6,4,'y',40),'iron',CH-12-k*11);
+  add(cylG(38,30,4,'y',32),'iron',CH+0.5);
+  const wp=new T.Mesh(cylG(20,20,110,'z',20),mat(pp,'steel')); wp.userData.part=pp; pg.add(wp); pickables.push(wp);
+  pistons[c]=pp;
+
+  const rp=part('rod'+c,{es:'Biela del cilindro '+c,en:'Cylinder '+c+' connecting rod',sys:'moviles',cyl:c,st:'est',page:'—',
+    fn:'Une el pistón con el cigüeñal. Convierte el movimiento lineal en giro (mecanismo biela-manivela).',
+    ver:['Su pie de biela recorre exactamente 147 mm'],est:['Longitud entre centros 260 mm (ajustable en Datos)','Sección de la caña']},G.pistons);
+  const be=new T.Mesh(cylG(54,54,42,'x',28),mat(rp,'steel')); be.castShadow=true; be.userData.part=rp; rp.add(be); pickables.push(be);
+  const sh=new T.Mesh(rodShaftGeo,mat(rp,'steel')); sh.castShadow=true; sh.userData.part=rp; rp.add(sh); pickables.push(sh);
+  const se=new T.Mesh(cylG(30,30,40,'x',24),mat(rp,'steel')); se.castShadow=true; se.userData.part=rp; rp.add(se); pickables.push(se);
+  rp.userData.sh=sh; rp.userData.se=se; rods[c]=rp;
+
+  // columna de gas (visual) y chorro de inyección
+  const gm=new T.MeshBasicMaterial({color:0x4fe3f0,transparent:true,opacity:.2,depthWrite:false,side:T.DoubleSide});
+  allMats.push(gm); gm.userData={fx:true};
+  const gc=new T.Mesh(cylG(61,61,1,'y',36),gm); gc.position.x=XC(c); G.pistons.add(gc); gas[c]=gc;
+  const sm=new T.MeshBasicMaterial({color:0xffd27a,transparent:true,opacity:0,depthWrite:false,blending:T.AdditiveBlending});
+  allMats.push(sm); sm.userData={fx:true};
+  const sp=new T.Mesh(new T.ConeGeometry(42,46,24,1,true),sm); sp.position.set(XC(c),DECK-24,0); G.head.add(sp); spray[c]=sp;
+}
+
+/* ---------- DISTRIBUCIÓN ---------- */
+const valves=[], rockers=[], pushrods=[], springs=[];
+let camShaft;
+{
+  const p=part('camshaft',{es:'Árbol de levas',en:'Camshaft',sys:'distribucion',st:'sim',page:'—',
+    fn:'Gira a la mitad de velocidad que el cigüeñal. Sus levas empujan las varillas que abren las válvulas en el momento justo.',
+    ver:[],est:['Ubicación en el bloque, lado admisión','Perfil de levas DESCONOCIDO (lóbulos simplificados)']},G.cam);
+  camShaft=new T.Group(); camShaft.position.set(0,210,-125); p.add(camShaft);
+  const sm=new T.Mesh(cylG(20,20,1000,'x',20),mat(p,'steel')); sm.userData.part=p; camShaft.add(sm); pickables.push(sm);
+  const lobeGeo=box(20,1,1);
+  for(let c=1;c<=6;c++){
+    [['ex',-34,270],['in',34,450],['inj',0,720]].forEach(([k,dx,peak])=>{
+      const lg=new T.Group(); lg.position.x=XC(c)+dx; lg.rotation.x=((PHI[c]+peak)/2)*D2R; camShaft.add(lg);
+      const lb=new T.Mesh(cylG(30,30,20,'x',24),mat(p,'steel')); lb.userData.part=p; lg.add(lb); pickables.push(lb);
+      const nose=new T.Mesh(cylG(14,14,20,'x',16),mat(p,'steel')); nose.position.y=22; nose.userData.part=p; lg.add(nose); pickables.push(nose);
+      const flank=new T.Mesh(box(20,24,40),mat(p,'steel')); flank.position.y=11; flank.userData.part=p; lg.add(flank); pickables.push(flank);
+    });
+  }
+}
+const springGeo=(()=>{const pts=[];for(let i=0;i<=160;i++){const t=i/160,a=t*Math.PI*2*6;pts.push(new T.Vector3(Math.cos(a)*17,t*27,Math.sin(a)*17));}
+  return new T.TubeGeometry(new T.CatmullRomCurve3(pts),200,2.6,6,false);})();
+for(let c=1;c<=6;c++){
+  // válvulas
+  [['in',-1],['ex',1]].forEach(([k,s])=>{
+    const p=part(k+'v'+c,{es:(k==='in'?'Válvulas de admisión':'Válvulas de escape')+' · cilindro '+c,en:(k==='in'?'Intake valves':'Exhaust valves')+' · cylinder '+c,
+      sys:'distribucion',cyl:c,st:'sim',page:'361 (4 válvulas por cilindro)',
+      fn:k==='in'?'Se abren durante la admisión para dejar entrar el aire comprimido por el turbo.':'Se abren durante el escape para dejar salir los gases quemados hacia el turbo.',
+      ver:['2 válvulas de '+(k==='in'?'admisión':'escape')+' por cilindro'],est:['Diámetro de cabeza 40 mm','Alzada 14 mm','Apertura idealizada de 180° (ángulos reales DESCONOCIDOS)']},G.valvetrain);
+    const vg=new T.Group(); p.add(vg);
+    for(const dx of[-30,30]){
+      const head=new T.Mesh(cylG(20,13,7,'y',28),mat(p,'steel')); head.position.set(XC(c)+dx,DECK+8,s*34); head.userData.part=p; vg.add(head); pickables.push(head);
+      const stem=new T.Mesh(cylG(4.5,4.5,150,'y',10),mat(p,'steel')); stem.position.set(XC(c)+dx,DECK+80,s*34); stem.userData.part=p; vg.add(stem); pickables.push(stem);
+      const ret=new T.Mesh(cylG(16,12,6,'y',16),mat(p,'brass')); ret.position.set(XC(c)+dx,HEAD_TOP+30,s*34); ret.userData.part=p; vg.add(ret); pickables.push(ret);
+      const spr=new T.Mesh(springGeo,mat(p,'copper')); spr.position.set(XC(c)+dx,HEAD_TOP,s*34); spr.userData.part=p; p.add(spr); pickables.push(spr); springs.push({m:spr,c,k});
+    }
+    const xh=new T.Mesh(box(84,8,18),mat(p,'iron')); xh.position.set(XC(c),HEAD_TOP+37,s*34); xh.userData.part=p; vg.add(xh); pickables.push(xh);
+    valves.push({g:vg,c,k});
+  });
+  // balancines y varillas
+  const rp=part('rock'+c,{es:'Balancines · cilindro '+c,en:'Rocker levers · cylinder '+c,sys:'distribucion',cyl:c,st:'sim',page:'—',
+    fn:'Palancas que invierten el empuje de la varilla: cuando la varilla sube, el balancín empuja la válvula hacia abajo y la abre.',ver:[],est:['Geometría y relación de palanca simplificadas']},G.valvetrain);
+  const shaft=new T.Mesh(cylG(10,10,PITCH-6,'x',12),mat(rp,'steel')); shaft.position.set(XC(c),HEAD_TOP+52,-75); shaft.userData.part=rp; rp.add(shaft); pickables.push(shaft);
+  [['in',-34,-1],['ex',34,1],['inj',0,0]].forEach(([k,dx,s])=>{
+    const g=new T.Group(); g.position.set(XC(c)+dx,HEAD_TOP+52,-75); rp.add(g);
+    const zEnd=k==='inj'?75:s*34+75; // desde el eje (z=-75) hasta la cruceta o el inyector
+    const arm=new T.Mesh(box(18,16,zEnd+55),mat(rp,'iron')); arm.position.z=(zEnd-55)/2; arm.userData.part=rp; g.add(arm); pickables.push(arm);
+    rockers.push({g,c,k,arm:zEnd});
+  });
+  const pr=part('push'+c,{es:'Varillas de empuje · cilindro '+c,en:'Push tubes · cylinder '+c,sys:'distribucion',cyl:c,st:'sim',page:'—',
+    fn:'Transmiten el movimiento de la leva, en el bloque, hasta los balancines, en la culata.',ver:[],est:['Disposición simplificada: varillas verticales']},G.push);
+  [['in',-34],['ex',34],['inj',0]].forEach(([k,dx])=>{
+    const m=new T.Mesh(cylG(7,7,330,'y',10),mat(pr,'steel')); m.position.set(XC(c)+dx,245+165,-130); m.userData.part=pr; pr.add(m); pickables.push(m);
+    pushrods.push({m,c,k,y0:245+165});
+  });
+  // inyector
+  const ip=part('inj'+c,{es:'Inyector · cilindro '+c,en:'Fuel injector · cylinder '+c,sys:'combustible',cyl:c,st:'sim',page:'196–198 (flujo de combustible)',
+    fn:'Pulveriza el combustible a alta presión dentro del cilindro al final de la compresión. El calor del aire comprimido lo enciende (diésel, sin bujía).',
+    ver:['Un inyector por cilindro'],est:['Forma y dimensiones','Momento de inyección idealizado cerca del PMS']},G.head);
+  mesh(ip,cylG(11,11,150,'y',16),'brass',XC(c),DECK+85,0);
+  mesh(ip,cylG(17,17,40,'y',16),'brass',XC(c),HEAD_TOP+20,0);
+  mesh(ip,cylG(5,2,14,'y',10),'steel',XC(c),DECK+3,0);
+}
+
+/* ---------- ADMISIÓN / AFTERCOOLER / COMBUSTIBLE / ELECTRÓNICA (lado admisión, -Z) ---------- */
+{
+  const p=part('intakeman',{es:'Colector de admisión',en:'Intake manifold',sys:'admision',st:'sim',page:'29–39, 213–214',
+    fn:'Reparte el aire enfriado del aftercooler entre los 6 cilindros.',ver:[],est:['Forma y posición']},G.intake,{shell:true});
+  mesh(p,rbox(940,80,70,16),'alu',0,490,-200);
+  for(let c=1;c<=6;c++) mesh(p,box(90,50,40),'alu',XC(c),480,-160);
+}
+{
+  const p=part('aftercooler',{es:'Aftercooler (enfriador del aire de admisión)',en:'Aftercooler',sys:'turbo',st:'sim',page:'32, 213',
+    fn:'Enfría el aire que sale caliente del turbo. Aire más frío es más denso: entra más oxígeno en cada cilindro. En los motores marinos de los diagramas lo refrigera agua de mar.',
+    ver:['Presente en el circuito de admisión (diagrama pág. 213)'],est:['Tamaño y posición']},G.intake,{shell:true});
+  mesh(p,rbox(700,190,130,20),'alu',-40,610,-280);
+  for(let i=0;i<22;i++) mesh(p,box(4,170,134),'iron',-370+i*30,610,-280,false);
+  mesh(p,cylG(42,42,90,'x',24),'alu',-430,610,-280);
+}
+{
+  const p=part('ecm',{es:'ECM (módulo de control electrónico)',en:'Electronic Control Module',sys:'accesorios',st:'sim',page:'26, 30',
+    fn:'Ordenador del motor. Lee los sensores y decide cuánto combustible inyectar y cuándo. Tiene una placa refrigerada por combustible.',
+    ver:['Placa de datos propia del ECM (pág. 26)','Placa de refrigeración del ECM por combustible (diagrama pág. 196)'],est:['Tamaño y ubicación']},G.intake);
+  mesh(p,rbox(300,210,46,8),'black',160,170,-215);
+  for(let i=0;i<9;i++) mesh(p,box(290,5,10),'iron',160,85+i*21,-243,false);
+  mesh(p,cylG(18,18,30,'z',16),'black',300,240,-235);
+}
+{
+  const p=part('fuelpump',{es:'Bomba de combustible',en:'Fuel pump',sys:'combustible',st:'sim',page:'27, 196',
+    fn:'Aspira el combustible del depósito y lo envía a presión hacia los inyectores. Tiene su propia placa de datos encima.',ver:['Placa de datos en la parte superior (pág. 27)'],est:['Forma y posición']},G.intake);
+  mesh(p,rbox(220,130,100,14),'alu',-260,190,-220);
+  mesh(p,cylG(36,36,60,'x',20),'iron',-150,190,-220);
+}
+{
+  const p=part('fuelfilter',{es:'Filtro de combustible',en:'Fuel filter',sys:'combustible',st:'sim',page:'31, 196',
+    fn:'Retiene partículas y agua antes de que el combustible llegue a la bomba y a los inyectores.',ver:[],est:['Posición']},G.intake);
+  mesh(p,cylG(52,52,190,'y',32),'red',-40,30,-280);
+  mesh(p,cylG(56,56,26,'y',32),'alu',-40,138,-280);
+}
+{
+  const p=part('oilfilter',{es:'Filtros de aceite',en:'Lubricating oil filters',sys:'lubricacion',st:'sim',page:'29, 199',
+    fn:'Limpian el aceite antes de enviarlo a las galerías del bloque y a los cojinetes.',ver:[],est:['Número y posición']},G.intake);
+  mesh(p,cylG(60,60,230,'y',32),'black',330,-10,-285);
+  mesh(p,cylG(48,48,180,'y',32),'black',200,0,-285);
+  mesh(p,box(300,40,90),'alu',265,120,-250);
+}
+{
+  const p=part('aircomp',{es:'Compresor de aire',en:'Air compressor',sys:'aire',st:'ver',page:'368',
+    fn:'Accesorio que produce aire comprimido (frenos, arranque neumático o servicios). Se lubrica con el aceite del motor y se refrigera con su refrigerante.',
+    ver:['Versión 18,7 CFM: alto 217,4 · ancho 142 · largo 216 mm','1 cilindro · calibre 85 mm · carrera 56 mm'],est:['Posición en el motor']},G.intake);
+  mesh(p,box(216,140,142),'alu',-400,250,-262);
+  mesh(p,box(150,77,120),'iron',-400,358,-262);
+  mesh(p,cylG(14,14,60,'z',12),'brass',-450,358,-340);
+}
+
+/* ---------- ESCAPE Y TURBO (+Z) ---------- */
+{
+  const p=part('exhman',{es:'Colector de escape (refrigerado por agua)',en:'Water-cooled exhaust manifold',sys:'escape',st:'sim',page:'14 (lista marina), 215–218',
+    fn:'Recoge los gases de los 6 cilindros y los lleva a la turbina del turbo. En marino va refrigerado por agua para bajar la temperatura superficial.',ver:['Colector de escape refrigerado por agua en aplicaciones marinas (pág. 38)'],est:['Forma y posición']},G.exhaust,{shell:true});
+  mesh(p,rbox(900,90,80,18),'hot',-30,500,215);
+  for(let c=1;c<=6;c++) mesh(p,box(80,60,50),'hot',XC(c),490,175);
+}
+const turboWheels=[];
+{
+  const p=part('turbo',{es:'Turbocompresor',en:'Turbocharger',sys:'turbo',st:'sim',page:'38–39, 213–218',
+    fn:'Los gases de escape hacen girar la turbina; un eje común mueve el compresor, que comprime el aire de admisión. Aprovecha energía que se perdería por el escape.',
+    ver:['Turbocompresor presente (vistas págs. 38–39)'],est:['Tamaño, posición y orientación','La velocidad de giro mostrada es solo visual']},G.turbo);
+  const tx=-330,ty=700,tz=230;
+  mesh(p,new T.TorusGeometry(80,46,16,40).rotateY(Math.PI/2),'hot',tx,ty,tz);
+  mesh(p,cylG(62,62,70,'x',32),'hot',tx,ty,tz);
+  mesh(p,cylG(40,40,90,'x',24),'iron',tx-95,ty,tz);
+  mesh(p,new T.TorusGeometry(84,40,16,40).rotateY(Math.PI/2),'alu',tx-190,ty,tz);
+  mesh(p,cylG(64,64,60,'x',32),'alu',tx-190,ty,tz);
+  mesh(p,cylG(46,46,110,'x',24,true),'alu',tx-265,ty,tz);
+  for(const [dx,k,n] of [[0,'steel',11],[-190,'alu',12]]){
+    const w=new T.Group(); w.position.set(tx+dx,ty,tz); p.add(w);
+    for(let i=0;i<n;i++){const b=new T.Mesh(box(56,4,36),mat(p,k)); const a=i/n*Math.PI*2; b.position.set(0,Math.cos(a)*30,Math.sin(a)*30); b.rotation.x=-a; b.rotation.y=.5; b.userData.part=p; w.add(b); pickables.push(b);}
+    const hub=new T.Mesh(cylG(14,22,60,'x',16),mat(p,'steel')); hub.userData.part=p; w.add(hub); pickables.push(hub);
+    turboWheels.push(w);
+  }
+  mesh(p,cylG(55,55,90,'y',32),'hot',tx,ty+110,tz+40);
+}
+{
+  const p=part('elbow',{es:'Codo de escape húmedo',en:'Exhaust elbow',sys:'escape',st:'sim',page:'215–218',
+    fn:'Salida de los gases tras la turbina. En marino se mezcla con el agua de mar de descarga.',ver:[],est:['Forma y dirección']},G.turbo);
+  mesh(p,cylG(60,60,120,'z',32),'hot',-330,860,330);
+  mesh(p,cylG(70,70,30,'z',32),'iron',-330,860,395);
+}
+{
+  const p=part('aircleaner',{es:'Filtro de aire',en:'Air cleaner',sys:'admision',st:'sim',page:'35',
+    fn:'Limpia el aire antes de que entre al compresor del turbo.',ver:[],est:['Tamaño y posición']},G.turbo);
+  mesh(p,cylG(100,100,170,'x',36),'black',-700,700,230);
+  mesh(p,cylG(104,104,10,'x',36),'red',-620,700,230);
+}
+
+/* ---------- REFRIGERACIÓN / AGUA DE MAR / ACCESORIOS DELANTEROS ---------- */
+{
+  const p=part('hx',{es:'Intercambiador de calor',en:'Heat exchanger',sys:'refrigeracion',st:'sim',page:'31, 38, 201–208',
+    fn:'El refrigerante del motor cede su calor al agua de mar sin mezclarse con ella: cada uno circula por su propio circuito.',ver:['Presente en la configuración con intercambiador (pág. 38)'],est:['Tamaño y posición']},G.top,{shell:true});
+  mesh(p,cylG(92,92,520,'x',40),'paint2',60,740,0);
+  for(const x of[-210,330]) mesh(p,cylG(104,104,26,'x',40),'iron',x,740,0);
+}
+{
+  const p=part('exptank',{es:'Depósito de expansión',en:'Expansion tank',sys:'refrigeracion',st:'sim',page:'31, 38',
+    fn:'Absorbe la dilatación del refrigerante caliente y permite rellenarlo. Lleva el tapón de presión.',ver:[],est:['Tamaño y posición']},G.top,{shell:true});
+  mesh(p,rbox(200,190,330,24),'paint2',450,755,0);
+  mesh(p,cylG(32,32,30,'y',24),'black',470,865,60);
+}
+{
+  const p=part('thermostat',{es:'Carcasa del termostato',en:'Thermostat housing',sys:'refrigeracion',st:'sim',page:'175–178, 201–212',
+    fn:'El termostato mantiene el motor a su temperatura de trabajo: cerrado, el refrigerante vuelve a la bomba; abierto, va al intercambiador.',ver:[],est:['Posición y forma']},G.front);
+  mesh(p,box(110,110,120),'alu',470,600,140);
+  mesh(p,cylG(36,36,120,'y',20),'alu',470,690,140);
+}
+{
+  const p=part('waterpump',{es:'Bomba de agua',en:'Water pump',sys:'refrigeracion',st:'sim',page:'164–169, 201',
+    fn:'Hace circular el refrigerante por el bloque, la culata y el intercambiador. La mueve una correa.',ver:[],est:['Posición y tamaño']},G.front);
+  mesh(p,cylG(85,85,70,'x',32),'alu',590,140,130);
+  mesh(p,cylG(70,70,26,'x',32),'steel',650,140,130);
+}
+{
+  const p=part('seapump',{es:'Bomba de agua de mar',en:'Sea water pump',sys:'aguamar',st:'sim',page:'170–174, 201',
+    fn:'Aspira agua del mar o del río y la envía al aftercooler y al intercambiador. Después se descarga por el escape.',ver:['Presente en aplicaciones marinas (diagrama pág. 201)'],est:['Posición y tamaño']},G.front);
+  mesh(p,cylG(80,80,90,'x',32),'copper',600,-90,-170);
+  mesh(p,cylG(40,40,60,'y',20),'copper',600,-10,-170);
+}
+{
+  const p=part('alternator',{es:'Alternador',en:'Alternator',sys:'accesorios',st:'sim',page:'31, 35',
+    fn:'Genera la electricidad que carga las baterías y alimenta el sistema eléctrico. Lo mueve la correa.',ver:[],est:['Posición y tamaño']},G.front);
+  mesh(p,cylG(82,82,150,'x',36),'alu',600,420,-215);
+  for(let i=0;i<10;i++) mesh(p,box(150,4,166),'iron',600,350+i*15,-215,false);
+  mesh(p,cylG(45,45,28,'x',24),'steel',690,420,-215);
+}
+{
+  const p=part('belt',{es:'Correa de accesorios',en:'Drive belt',sys:'accesorios',st:'sim',page:'158–163',
+    fn:'Transmite el giro del cigüeñal al alternador y a la bomba de agua.',ver:[],est:['Recorrido simplificado']},G.front);
+  const pts=[];const arc=(cy,cz,r,a0,a1)=>{for(let i=0;i<=8;i++){const a=a0+(a1-a0)*i/8;pts.push(new T.Vector3(695,cy+Math.sin(a)*r,cz+Math.cos(a)*r));}};
+  arc(0,0,112,-2.2,-0.6); arc(140,130,72,-0.4,1.3); arc(420,-215,48,1.2,3.6);
+  mesh(p,new T.TubeGeometry(new T.CatmullRomCurve3(pts,true),160,6,6,true),'rubber',0,0,0);
+}
+{
+  const p=part('starter',{es:'Motor de arranque',en:'Starting motor',sys:'accesorios',st:'sim',page:'30, 33, 189–191',
+    fn:'Motor eléctrico que engrana con la corona del volante para hacer girar el motor en el arranque.',ver:[],est:['Posición y tamaño']},G.rear);
+  mesh(p,cylG(66,66,260,'x',32),'black',-470,-150,-235);
+  mesh(p,cylG(36,36,170,'x',24),'black',-470,-60,-235);
+}
+
+/* ================= RUTAS DE FLUIDOS ================= */
+const V=(x,y,z)=>new T.Vector3(x,y,z);
+const SYS={
+  estructura:{n:'Estructura',en:'Block, head, covers',col:'#8a96a3'},
+  moviles:{n:'Pistones y bielas',en:'Pistons & rods',col:'#aab2b9'},
+  cigueñal:{n:'Cigüeñal y volante',en:'Crankshaft',col:'#c8cdd2'},
+  distribucion:{n:'Distribución',en:'Valve train',col:'#b87333'},
+  combustible:{n:'Combustible',en:'Fuel',col:'#ff8a2a'},
+  lubricacion:{n:'Lubricación',en:'Lubricating oil',col:'#f2d23c'},
+  refrigeracion:{n:'Refrigeración',en:'Coolant',col:'#3d8bff'},
+  aguamar:{n:'Agua de mar',en:'Sea water (marino)',col:'#4d6fe0'},
+  admision:{n:'Admisión',en:'Air intake',col:'#4fe3f0'},
+  turbo:{n:'Turbo / Aftercooler',en:'Turbocharger',col:'#d4b06a'},
+  escape:{n:'Escape',en:'Exhaust',col:'#ff4a3d'},
+  aire:{n:'Aire comprimido',en:'Compressed air',col:'#c9b6ff'},
+  accesorios:{n:'Accesorios',en:'Accessories',col:'#7f8b97'},
+};
+const FLOWS={combustible:[],lubricacion:[],refrigeracion:[],aguamar:[],admision:[],escape:[],aire:[]};
+function route(sys,pts,ext=true,w=1){FLOWS[sys].push({c:new T.CatmullRomCurve3(pts,false,'catmullrom',0.15),ext,w});}
+// Combustible: depósito → filtro → bomba → placa ECM → galería culata → inyectores ; retorno
+route('combustible',[V(-150,-80,-520),V(-40,-80,-300),V(-40,40,-280),V(-40,150,-280),V(-150,190,-250),V(-260,190,-275)]);
+route('combustible',[V(-260,190,-275),V(-200,240,-250),V(0,240,-248),V(160,250,-245),V(250,320,-230),V(250,520,-140),V(250,520,-60)]);
+route('combustible',[V(250,520,-60),V(-450,520,-60)],false,1.4);
+for(let c=1;c<=6;c++) route('combustible',[V(XC(c),520,-60),V(XC(c),500,-25),V(XC(c),DECK+5,0)],false,.5);
+route('combustible',[V(-450,530,-60),V(-480,560,-150),V(-480,400,-330),V(-200,-60,-540)],true,.6);
+// Lubricación: cárter → bomba → enfriador → filtros → galería → apoyos / levas / balancines → retorno
+route('lubricacion',[V(200,-330,0),V(380,-300,0),V(470,-120,0),V(470,40,-120),V(330,110,-250),V(200,110,-250),V(150,120,-160),V(150,120,-110)],false);
+route('lubricacion',[V(450,120,-110),V(-450,120,-110)],false,1.3);
+for(let i=0;i<=6;i++){const x=(3-i)*PITCH; route('lubricacion',[V(x,120,-110),V(x,60,-60),V(x,0,0)],false,.35);}
+route('lubricacion',[V(300,120,-110),V(300,210,-125)],false,.3);
+route('lubricacion',[V(-400,120,-110),V(-420,300,-110),V(-420,HEAD_TOP+52,-75),V(420,HEAD_TOP+52,-75)],false,.9);
+route('lubricacion',[V(420,HEAD_TOP+40,0),V(480,300,0),V(400,-100,0),V(250,-300,0)],false,.6);
+// Refrigeración: bomba → bloque → culata → termostato → intercambiador → bomba
+route('refrigeracion',[V(590,140,130),V(470,200,150),V(0,260,140),V(-450,280,140),V(-460,470,110),V(0,490,100),V(420,510,120),V(470,600,140),V(470,700,140),V(380,740,60),V(0,740,0),V(-200,740,0)],false);
+route('refrigeracion',[V(-200,740,-40),V(-260,700,-120),V(-100,640,-180),V(400,560,-150),V(560,300,-80),V(600,140,60),V(590,140,130)],true,.8);
+// Agua de mar: toma → bomba → aftercooler → intercambiador → codo de escape → descarga
+route('aguamar',[V(760,-330,-420),V(640,-200,-300),V(600,-90,-170),V(560,60,-330),V(300,400,-360),V(260,600,-350),V(-40,610,-280),V(-380,610,-280),V(-480,660,-200),V(-300,760,-80),V(-200,740,0),V(330,740,0),V(400,820,120),V(0,880,260),V(-330,880,330),V(-330,880,520)],true);
+// Admisión: filtro → compresor → aftercooler → colector → cilindros
+route('admision',[V(-800,700,230),V(-700,700,230),V(-560,700,230),V(-520,700,230),V(-500,790,180),V(-480,820,-40),V(-470,700,-270),V(-430,610,-280),V(300,610,-280),V(330,560,-240),V(300,500,-200),V(-450,490,-200)],true);
+for(let c=1;c<=6;c++) route('admision',[V(XC(c),490,-200),V(XC(c),480,-120),V(XC(c),450,-40),V(XC(c),DECK-10,-20)],false,.45);
+// Escape: cilindros → colector → turbina → codo
+for(let c=1;c<=6;c++) route('escape',[V(XC(c),DECK-10,20),V(XC(c),450,40),V(XC(c),480,120),V(XC(c),500,215)],false,.45);
+route('escape',[V(450,500,215),V(-300,500,215),V(-330,560,230),V(-330,630,230),V(-330,700,230),V(-330,800,280),V(-330,860,330),V(-330,860,560)],true,1.3);
+// Aire comprimido
+route('aire',[V(-460,360,-300),V(-460,420,-420),V(-200,420,-520),V(200,300,-560)],true);
+
+const PCOL={combustible:0xff8a2a,lubricacion:0xf2d23c,refrigeracion:0x3d8bff,aguamar:0x2f55d6,admision:0x4fe3f0,escape:0xff4a3d,aire:0xc9b6ff};
+const flowG=new T.Group(); scene.add(flowG);
+const dotTex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');const g=x.createRadialGradient(32,32,0,32,32,32);
+  g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.35,'rgba(255,255,255,.85)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64);
+  const t=new T.CanvasTexture(c); t.encoding=T.sRGBEncoding; return t;})();
+const flowObjs={};
+for(const s in FLOWS){
+  const o={pipes:new T.Group(),pts:null,parts:[]};
+  const pm=new T.MeshStandardMaterial({color:PCOL[s],roughness:.4,metalness:.3,transparent:true,opacity:.55,side:T.DoubleSide,depthWrite:false});
+  pm.userData={fx:true}; allMats.push(pm);
+  FLOWS[s].forEach(f=>{ if(f.ext){ const m=new T.Mesh(new T.TubeGeometry(f.c,Math.max(16,Math.round(f.c.getLength()/25)),11,8,false),pm); o.pipes.add(m);} });
+  flowG.add(o.pipes);
+  let n=0; FLOWS[s].forEach(f=>{const k=Math.max(4,Math.round(f.c.getLength()/38*f.w)); for(let i=0;i<k;i++){o.parts.push({f,t:Math.random()});n++;}});
+  const geo=new T.BufferGeometry(); geo.setAttribute('position',new T.BufferAttribute(new Float32Array(n*3),3));
+  const ptm=new T.PointsMaterial({color:PCOL[s],size:s==='aguamar'?26:22,map:dotTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending,sizeAttenuation:true});
+  ptm.userData={fx:true}; allMats.push(ptm);
+  o.pts=new T.Points(geo,ptm); o.pts.frustumCulled=false; flowG.add(o.pts);
+  flowObjs[s]=o;
+}
+
+/* ================= ESTADO ================= */
+const S={theta:0,playing:true,rpm:20,explode:0,xray:false,sec:false,axis:'z',secPos:0,labels:true,particles:true,pspeed:1,
+  sys:Object.fromEntries(Object.keys(SYS).map(k=>[k,true])),sel:null,tour:-1};
+const plane=new T.Plane(new T.Vector3(0,0,-1),0);
+for(const id in parts) parts[id].traverse(o=>{if(o.isMesh)o.userData.part=parts[id];});
+for(const g in G){G[g].userData.base=G[g].position.clone();}
+
+/* ================= CINEMÁTICA ================= */
+function phaseOf(c,th){ const a=(((th-PHI[c])%720)+720)%720; // a=0: PMS de compresión, inicio de combustión
+  if(a<180)return{a,k:'exp',n:'Combustión / expansión',cls:'ph-exp'};
+  if(a<360)return{a,k:'esc',n:'Escape',cls:'ph-esc'};
+  if(a<540)return{a,k:'adm',n:'Admisión',cls:'ph-adm'};
+  return{a,k:'com',n:'Compresión',cls:'ph-com'}; }
+function liftOf(c,th,k){const a=phaseOf(c,th).a;
+  if(k==='in') return (a>=360&&a<540)?LIFT*Math.sin((a-360)/180*Math.PI):0;
+  if(k==='ex') return (a>=180&&a<360)?LIFT*Math.sin((a-180)/180*Math.PI):0;
+  const d=a>360?a-720:a; return (d>-40&&d<10)?6*Math.sin((d+40)/50*Math.PI):0; }
+const cBase=new T.Color(), cAir=new T.Color(0x4fe3f0), cHot=new T.Color(0xffb347), cWhite=new T.Color(0xfff1c9), cExh=new T.Color(0x8a5a52);
+function kinematics(){
+  const th=S.theta, off=L0-L;
+  crankRot.position.y=off;
+  crankRot.rotation.x=-th*D2R;                       // horario visto desde el frente (+X)
+  for(let c=1;c<=6;c++){
+    const b=(th-PHI[c])*D2R, s=Math.sin(b), co=Math.cos(b);
+    const yPin=off+R*co, zPin=-R*s;
+    const yP=off+R*co+Math.sqrt(L*L-R*R*s*s);        // x(θ) = r cosθ + √(L² − r² sin²θ)
+    pistons[c].position.set(XC(c),yP,0);
+    const rp=rods[c]; rp.position.set(XC(c),yPin,zPin);
+    rp.rotation.x=Math.atan2(-zPin,yP-yPin);
+    rp.userData.sh.scale.y=L-70; rp.userData.sh.position.y=L/2; rp.userData.se.position.y=L;
+    const ph=phaseOf(c,th), crown=yP+CH, h=Math.max(2,DECK-crown);
+    const g=gas[c]; g.scale.y=h; g.position.y=crown+h/2;
+    const gm=g.material; let op=.18;
+    if(ph.k==='adm'){gm.color.copy(cAir);op=.22;}
+    else if(ph.k==='com'){const t=(ph.a-540)/180; gm.color.copy(cAir).lerp(cWhite,t*.6); op=.2+t*.25;}
+    else if(ph.k==='exp'){const t=Math.min(1,ph.a/150); gm.color.copy(cWhite).lerp(cHot,Math.min(1,t*2)).lerp(cExh,Math.max(0,t-.4)); op=.85-t*.55;}
+    else {gm.color.copy(cExh); op=.22;}
+    gm.opacity=op;
+    const d=ph.a>360?ph.a-720:ph.a; const sp=spray[c].material; sp.opacity=(d>-6&&d<22)?.85*(1-Math.abs(d-6)/16):0;
+  }
+  valves.forEach(v=>{v.g.position.y=-liftOf(v.c,th,v.k);});
+  springs.forEach(s=>{const l=liftOf(s.c,th,s.k); s.m.scale.y=(27-l*0.9)/27;});
+  rockers.forEach(r=>{r.g.rotation.x=Math.atan2(liftOf(r.c,th,r.k),r.arm);});
+  pushrods.forEach(p=>{p.m.position.y=p.y0+liftOf(p.c,th,p.k)*0.7;});
+  camShaft.rotation.x=-th/2*D2R;
+}
+
+/* ================= SECCIÓN / RAYOS X / VISIBILIDAD ================= */
+function applyMaterials(){
+  const planes=S.sec?[plane]:null;
+  allMats.forEach(m=>{
+    m.clippingPlanes=planes; m.clipShadows=true;
+    if(m.userData.fx) {m.needsUpdate=true; return;}
+    const sh=m.userData.shell;
+    if(S.xray&&sh){m.transparent=true;m.opacity=.13;m.depthWrite=false;}
+    else if(S.xray){m.transparent=false;m.opacity=1;m.depthWrite=true;}
+    else {m.transparent=false;m.opacity=1;m.depthWrite=true;}
+    m.needsUpdate=true;
+  });
+  for(const id in parts){parts[id].traverse(o=>{if(o.isMesh)o.castShadow=!(S.xray&&parts[id].userData.shell);});}
+}
+function applySection(){
+  const n={x:V(-1,0,0),y:V(0,-1,0),z:V(0,0,-1)}[S.axis];
+  const range={x:700,y:500,z:400}[S.axis]; const mid={x:0,y:250,z:0}[S.axis];
+  plane.normal.copy(n); plane.constant=mid+S.secPos/100*range;
+}
+function applyVisibility(){
+  for(const id in parts){parts[id].visible=!!S.sys[PI_[id].sys];}
+  for(let c=1;c<=6;c++){gas[c].visible=S.sys.moviles; spray[c].visible=S.sys.combustible;}
+  const flowsOn=S.explode<2;
+  for(const s in flowObjs){const on=flowsOn&&S.sys[s==='admision'?'admision':s]&&true; flowObjs[s].pipes.visible=on; flowObjs[s].pts.visible=on&&S.particles;}
+}
+function applyExplode(){const k=S.explode/100; for(const g in G){G[g].position.copy(G[g].userData.base).addScaledVector(G[g].userData.ex,k);} applyVisibility();}
+
+/* ================= SELECCIÓN ================= */
+const ray=new T.Raycaster(), ndc=new T.Vector2();
+function pick(ev){
+  const r=renderer.domElement.getBoundingClientRect();
+  ndc.set((ev.clientX-r.left)/r.width*2-1,-(ev.clientY-r.top)/r.height*2+1);
+  ray.setFromCamera(ndc,camera);
+  const hits=ray.intersectObjects(pickables,false);
+  for(const h of hits){
+    let o=h.object, p=o.userData.part; if(!p||!p.visible)continue;
+    let vis=true; o.traverseAncestors(a=>{if(!a.visible)vis=false;}); if(!vis)continue;
+    if(S.sec&&plane.distanceToPoint(h.point)<0)continue;
+    if(S.xray&&p.userData.shell&&hits.some(x=>x.object.userData.part&&!x.object.userData.part.userData.shell&&x.object.userData.part.visible))continue;
+    return p.userData.partId;
+  }
+  return null;
+}
+const hl=new T.Color(0xd4b06a);
+function select(id){
+  if(S.sel&&parts[S.sel]) for(const k in parts[S.sel].userData.mats) parts[S.sel].userData.mats[k].emissive.setRGB(0,0,0);
+  S.sel=id;
+  if(id&&parts[id]) for(const k in parts[id].userData.mats) parts[id].userData.mats[k].emissive.copy(hl).multiplyScalar(.45);
+  renderPart(); if(id) showTab('pieza');
+}
+let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>{down={x:e.clientX,y:e.clientY};});
+renderer.domElement.addEventListener('pointerup',e=>{ if(!down)return; if(Math.hypot(e.clientX-down.x,e.clientY-down.y)<6){select(pick(e));} down=null;});
+const tip=document.getElementById('tip'); let hoverT=0;
+renderer.domElement.addEventListener('pointermove',e=>{
+  if(e.pointerType!=='mouse'||e.buttons)return; const now=performance.now(); if(now-hoverT<60)return; hoverT=now;
+  const id=pick(e); if(id){tip.style.display='block';tip.textContent=PI_[id].es; tip.style.left=(e.clientX+14)+'px'; tip.style.top=(e.clientY+12)+'px'; renderer.domElement.style.cursor='pointer';}
+  else{tip.style.display='none';renderer.domElement.style.cursor='';}
+});
+renderer.domElement.addEventListener('pointerleave',()=>{tip.style.display='none';});
+
+/* ================= UI ================= */
+const $=s=>document.querySelector(s);
+const STL={ver:['VERIFICADO','st-ver'],est:['ESTIMADO','st-est'],sim:['SIMPLIFICADO','st-sim'],unk:['DESCONOCIDO','st-unk']};
+function pill(st){const[a,b]=STL[st];return `<span class="pill ${b}">${a}</span>`;}
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function renderPart(){
+  const el=$('#tab-pieza'); const id=S.sel;
+  const groups={}; for(const k in PI_){const s=PI_[k].sys; if(PI_[k].cyl>1)continue; (groups[s]=groups[s]||[]).push(k);}
+  let list='<h3>Todas las piezas</h3><div class="partlist">';
+  for(const s in SYS){ if(!groups[s])continue; list+=`<div class="small" style="margin-top:8px;color:${SYS[s].col}">${SYS[s].n}</div>`;
+    groups[s].forEach(k=>{list+=`<button data-pick="${k}">${esc(PI_[k].es.replace(' · cilindro 1','').replace(' del cilindro 1',''))}${PI_[k].cyl?' <span class="small">(1–6)</span>':''}</button>`;}); }
+  list+='</div>';
+  if(!id){ el.innerHTML=`<h2>Toca una pieza</h2><p class="small">Haz clic o toca cualquier componente del motor para ver qué es, para qué sirve y qué datos son del manual.</p>
+    <div class="legend">${pill('ver')}${pill('est')}${pill('sim')}${pill('unk')}</div>`+list; bindPicks(el); return; }
+  const p=PI_[id], sys=SYS[p.sys];
+  const cylNav=p.cyl?`<div class="row" style="margin:8px 0">${[1,2,3,4,5,6].map(c=>`<button class="btn ${c===p.cyl?'on':''}" data-pick="${id.replace(/\d+$/,'')+c}" style="min-width:38px">${c}</button>`).join('')}</div>`:'';
+  el.innerHTML=`<div class="row" style="justify-content:space-between"><span class="small" style="color:${sys.col}">${sys.n} · <span class="en">${sys.en}</span></span>${pill(p.st)}</div>
+    <h2 style="margin-top:6px">${esc(p.es)}</h2><div class="en">${esc(p.en)}</div>${cylNav}
+    <p>${esc(p.fn)}</p>
+    <dl class="kv">${p.cyl?`<dt>Cilindro</dt><dd>${p.cyl} (orden de encendido: posición ${FIRING.indexOf(p.cyl)+1}.ª)</dd>`:''}
+    <dt>Fuente</dt><dd>${p.page&&p.page!=='—'?'Bulletin 3666, pág. '+esc(p.page):'No documentado en Bulletin 3666'}</dd></dl>
+    ${p.ver.length?`<h3 class="st-ver">Datos verificados</h3><ul class="clean">${p.ver.map(x=>`<li>✓ ${esc(x)}</li>`).join('')}</ul>`:''}
+    ${p.est.length?`<h3 class="st-est">Estimado o simplificado</h3><ul class="clean">${p.est.map(x=>`<li>≈ ${esc(x)}</li>`).join('')}</ul>`:''}
+    <div class="row" style="margin-top:10px"><button class="btn" id="focusBtn">Centrar cámara</button><button class="btn" id="isoBtn">Aislar sistema</button><button class="btn" id="clrBtn">Quitar selección</button></div>`+list;
+  $('#focusBtn').onclick=()=>focusPart(id);
+  $('#isoBtn').onclick=()=>{for(const k in S.sys)S.sys[k]=(k===p.sys||k==='cigueñal'&&p.sys==='moviles'); syncSys(); applyVisibility();};
+  $('#clrBtn').onclick=()=>select(null);
+  bindPicks(el);
+}
+function bindPicks(el){el.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{const id=b.dataset.pick; if(!S.sys[PI_[id].sys]){S.sys[PI_[id].sys]=true;syncSys();applyVisibility();} select(id); focusPart(id);});}
+function focusPart(id){const b=new T.Box3().setFromObject(parts[id]); if(b.isEmpty())return; const c=b.getCenter(new T.Vector3()); const sz=b.getSize(new T.Vector3()).length();
+  const dir=camera.position.clone().sub(controls.target).normalize(); flyTo(c.clone().addScaledVector(dir,Math.max(700,sz*1.8)),c);}
+
+function showTab(t){document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
+  document.querySelectorAll('.tabpane').forEach(p=>p.hidden=p.id!=='tab-'+t);}
+document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+$('#panelToggle').onclick=()=>$('#panel').classList.toggle('open');
+
+// Cámara
+const VIEWS={front:[V(2600,320,0),V(0,240,0)],rear:[V(-2600,320,0),V(0,240,0)],side:[V(0,320,2900),V(0,240,0)],top:[V(1,3200,0),V(0,150,0)],iso:[V(1900,1250,2100),V(0,220,0)],reset:[V(2100,1150,2300),V(0,220,0)]};
+let fly=null;
+function fitK(){const a=camera.aspect; return a<1?1.15/Math.pow(a,.75):(a<1.3?1.15:1);}
+function flyTo(pos,tgt,ms=900){pos=tgt.clone().add(pos.clone().sub(tgt).multiplyScalar(fitK())); fly={p0:camera.position.clone(),t0:controls.target.clone(),p1:pos,t1:tgt.clone(),s:performance.now(),d:matchMedia('(prefers-reduced-motion: reduce)').matches?1:ms};}
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{const v=VIEWS[b.dataset.view]; flyTo(v[0],v[1]);});
+
+$('#explode').oninput=e=>{S.explode=+e.target.value; $('#explodeVal').textContent=S.explode+' %'; applyExplode();};
+$('#secOn').onchange=e=>{S.sec=e.target.checked; applySection(); applyMaterials();};
+document.querySelectorAll('[data-axis]').forEach(b=>b.onclick=()=>{S.axis=b.dataset.axis; document.querySelectorAll('[data-axis]').forEach(x=>x.classList.toggle('on',x===b)); applySection();});
+$('#secPos').oninput=e=>{S.secPos=+e.target.value; applySection();};
+$('#xray').onchange=e=>{S.xray=e.target.checked; applyMaterials();};
+$('#lbls').onchange=e=>{S.labels=e.target.checked;};
+$('#parts').onchange=e=>{S.particles=e.target.checked; applyVisibility();};
+$('#pspeed').oninput=e=>{S.pspeed=+e.target.value/100;};
+
+// Sistemas
+function syncSys(){ $('#syslist').innerHTML=Object.entries(SYS).map(([k,s])=>`<label class="sw"><input type="checkbox" data-sys="${k}" ${S.sys[k]?'checked':''}><span class="dot" style="background:${s.col}"></span><span>${s.n} <span class="en small">${s.en}</span></span></label>`).join('');
+  document.querySelectorAll('[data-sys]').forEach(i=>i.onchange=()=>{S.sys[i.dataset.sys]=i.checked; applyVisibility();}); }
+$('#showAll').onclick=()=>{for(const k in S.sys)S.sys[k]=true; syncSys(); applyVisibility();};
+$('#onlyCore').onclick=()=>{for(const k in S.sys)S.sys[k]=['moviles','cigueñal','distribucion'].includes(k); syncSys(); applyVisibility();};
+
+// Animación
+const playBtn=$('#play');
+function setPlay(v){S.playing=v; playBtn.textContent=v?'❚❚':'▶'; playBtn.setAttribute('aria-label',v?'Pausar':'Reproducir');}
+playBtn.onclick=()=>setPlay(!S.playing);
+$('#rst').onclick=()=>{S.theta=0; setPlay(false);};
+$('#p1').onclick=()=>{setPlay(false); S.theta=Math.round(S.theta)+1; if(S.theta>=720)S.theta-=720;};
+$('#m1').onclick=()=>{setPlay(false); S.theta=Math.round(S.theta)-1; if(S.theta<0)S.theta+=720;};
+$('#speed').oninput=e=>{S.rpm=+e.target.value; $('#rpm').textContent=S.rpm;};
+$('#cyls').innerHTML=FIRING.map(c=>`<div class="cy" id="cy${c}"><b>${c}</b><span>—</span><i></i></div>`).join('');
+const cyEls={}; FIRING.forEach(c=>{const e=$('#cy'+c); cyEls[c]={e,s:e.querySelector('span'),i:e.querySelector('i')}; e.title='Cilindro '+c; e.style.cursor='pointer'; e.onclick=()=>{select('piston'+c);};});
+const foEls=[...document.querySelectorAll('#fo em')];
+function updateHud(){
+  const th=((S.theta%720)+720)%720;
+  $('#angle').innerHTML=String(Math.floor(th)).padStart(3,'0')+'<small>°/720</small>';
+  let firing=-1;
+  FIRING.forEach((c,k)=>{const ph=phaseOf(c,th),o=cyEls[c]; o.e.className='cy '+ph.cls+(ph.k==='exp'&&ph.a<60?' fire':''); o.s.textContent=ph.n; o.i.style.width=((ph.a%180)/180*100)+'%'; if(ph.k==='exp'&&ph.a<120)firing=k;});
+  foEls.forEach((e,k)=>e.classList.toggle('now',k===firing));
+}
+
+/* ---------- Pestaña Datos ---------- */
+const ASSUME=[
+  ['Longitud de biela (entre centros)','rod','mm','240–290','Relación biela/manivela ≈ 3,5, habitual en diésel pesados de esta carrera.','est'],
+  ['Distancia entre cilindros',PITCH,'mm','140–160','≈ 1,2 × calibre: deja espacio a camisas y agua entre cilindros.','est'],
+  ['Longitud total del modelo','≈ 1 500','mm','1 300–1 600','Resultado de la geometría estimada (bloque + accesorios delanteros + volante).','est'],
+  ['Anchura total del modelo','≈ 1 000','mm','850–1 100','Resultado de colectores, aftercooler y turbo estimados.','est'],
+  ['Altura total del modelo','≈ 1 300','mm','1 000–1 350','Desde el cárter hasta el codo de escape; estimada.','est'],
+  ['Altura de compresión del pistón',CH,'mm','70–90','≈ 0,64 × calibre, proporción típica.','est'],
+  ['Altura total del pistón',PH,'mm','110–140','Proporción típica respecto al calibre.','est'],
+  ['Geometría del bloque','Volúmenes','—','—','Cajas y nervios simplificados para la visualización.','sim'],
+  ['Geometría del cigüeñal','Pares 1-6/2-5/3-4 a 0°/120°/240°','—','—','Deducido del orden 1-5-3-6-2-4 con la disposición estándar de un 6 en línea. Forma de contrapesos simplificada.','sim'],
+  ['Posición de accesorios','Aproximada','—','—','Según las vistas de las págs. 29–39; sin cotas.','est'],
+  ['Perfil de leva','DESCONOCIDO','—','—','No documentado. Lóbulos simbólicos.','unk'],
+  ['Diámetro de cabeza de válvula',40,'mm','38–45','Cabe 2 + 2 válvulas en un calibre de 125 mm.','est'],
+  ['Alzada de válvula',LIFT,'mm','12–16','Valor didáctico para que el movimiento sea visible.','est'],
+  ['Ángulos de apertura y cierre','DESCONOCIDO','°','—','Se usa apertura ideal de 180° por tiempo, sin solape.','unk'],
+  ['Árbol de levas en bloque con varillas','Supuesto','—','—','Disposición asumida para la visualización; no verificada en Bulletin 3666.','sim'],
+  ['Geometría de colectores','Esquemática','—','—','Rutas basadas en los diagramas de flujo (págs. 196–220).','sim'],
+  ['Inyección','≈ PMS de compresión','°','—','Chorro visual entre −6° y +22°; no es un reglaje real.','sim'],
+];
+let aFilter='all';
+function renderDatos(){
+  const rows=ASSUME.filter(r=>aFilter==='all'||r[5]===aFilter).map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]==='rod'?L:r[1]}</td><td>${r[2]}</td><td class="num">${r[3]}</td><td>${r[4]}</td><td>${r[5]==='ver'?SRC:EST}</td><td>${pill(r[5])}</td></tr>`).join('');
+  $('#tab-datos').innerHTML=`<h2>Ficha técnica</h2><div class="small">Fuente: ${SRC}</div>
+  <dl class="kv" style="margin-top:10px">
+   <dt>Tipo</dt><dd>Diésel 4 tiempos · pág. 361</dd><dt>Cilindros</dt><dd>6 en línea · pág. 361</dd><dt>Válvulas</dt><dd>4 por cilindro · pág. 361</dd>
+   <dt>Calibre (bore)</dt><dd>125 mm · pág. 361</dd><dt>Carrera (stroke)</dt><dd>147 mm · pág. 361</dd><dt>Cilindrada</dt><dd>10,8 L · pág. 361</dd>
+   <dt>Orden de encendido</dt><dd>1-5-3-6-2-4 · pág. 361</dd><dt>Giro</dt><dd>Horario, visto desde el frente · pág. 361</dd>
+   <dt>Peso industrial</dt><dd>940 kg · pág. 361</dd><dt>Peso marino</dt><dd>1 124 kg · pág. 361</dd><dt>Compresor 18,7 CFM</dt><dd>217 × 142 × 216 mm · pág. 368</dd></dl>
+  <p class="small">Modelo a escala en las dimensiones verificadas y estimado en las dimensiones no documentadas. 1 unidad 3D = 1 mm.</p>
+  <h3>Estado de los datos</h3><div class="legend">${pill('ver')} del manual ${pill('est')} estimación ${pill('sim')} simplificación didáctica ${pill('unk')} sin dato</div>
+  <h3>Supuestos del modelo</h3>
+  <div class="row" style="margin-bottom:6px">${['all','est','sim','unk'].map(f=>`<button class="btn ${aFilter===f?'on':''}" data-af="${f}">${{all:'Todos',est:'Estimados',sim:'Simplificados',unk:'Desconocidos'}[f]}</button>`).join('')}</div>
+  <div><span class="lab">Longitud de biela: <span id="lval">${L}</span> mm (estimado)</span><input type="range" id="lrod" min="240" max="290" value="${L}" aria-label="Longitud de biela"></div>
+  <p class="small">La carrera se mantiene en 147 mm con cualquier longitud de biela; solo cambia la aceleración del pistón cerca de los puntos muertos.</p>
+  <div class="tblwrap"><table><thead><tr><th>Parámetro</th><th>Valor</th><th>Unidad</th><th>Rango</th><th>Justificación</th><th>Fuente</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table></div>
+  <h3>Prioridad visual (decisiones tomadas)</h3>
+  <ul class="clean small">
+   <li>• Escala real en calibre, carrera y radio de manivela. El resto se ajustó para que se vea bien y se entienda.</li>
+   <li>• Válvulas con apertura ideal de 180° y alzada exagerada para que se note el movimiento.</li>
+   <li>• Columnas de gas de colores dentro de cada cilindro para leer el ciclo de un vistazo. No son una simulación termodinámica.</li>
+   <li>• Tuberías externas dibujadas como tubos de color. Su trazado es esquemático.</li>
+   <li>• Turbo girando a velocidad visual, sin relación con su velocidad real.</li>
+  </ul>
+  <div class="note warn"><b>MODELO DIDÁCTICO.</b> Esta representación tiene fines educativos y de visualización. No constituye un plano de fabricación, modelo CAD certificado ni documentación oficial de ingeniería de Cummins. Las dimensiones y configuraciones no documentadas han sido estimadas o simplificadas. Para reparación, montaje, ajuste o mantenimiento debe utilizarse la documentación técnica correspondiente a la variante y número de serie del motor.</div>
+  <div class="note">Representación visual esquemática de la combustión. No representa una simulación termodinámica. Movimiento de válvulas simplificado para fines didácticos. Los ángulos exactos de distribución deben verificarse en documentación específica del motor.</div>`;
+  document.querySelectorAll('[data-af]').forEach(b=>b.onclick=()=>{aFilter=b.dataset.af; renderDatos();});
+  $('#lrod').oninput=e=>{L=+e.target.value; $('#lval').textContent=L;};
+  $('#lrod').onchange=()=>renderDatos();
+}
+
+/* ---------- Aprender: recorrido, glosario, cuestionario ---------- */
+const ALL=Object.keys(SYS);
+const only=(...k)=>Object.fromEntries(ALL.map(s=>[s,k.includes(s)]));
+const TOUR=[
+ {t:'¿Qué es el QSM11?',p:['Motor diésel Cummins de 10,8 litros para uso marino, industrial y de generación. Este visor muestra la versión marina con intercambiador de calor.','Gira el modelo con el ratón o el dedo. Las etiquetas indican el frente (cilindro 1), la parte posterior y los lados de admisión y escape.'],v:'iso',sys:ALL,x:false,e:0},
+ {t:'Arquitectura de 6 cilindros',p:['Seis cilindros en línea numerados del 1 (frente) al 6 (volante). Cada uno tiene 125 mm de diámetro y su pistón recorre 147 mm.','6 × π/4 × 12,5² × 14,7 cm ≈ 10 824 cm³, es decir, los 10,8 L de la ficha.'],v:'side',sys:only('estructura','moviles','cigueñal'),x:true,e:0},
+ {t:'Bloque y culata (block, head)',p:['El bloque es la estructura principal: aloja los cilindros y el cigüeñal. La culata cierra los cilindros por arriba y contiene las válvulas e inyectores.','En la vista explosionada se ve cómo se separan.'],v:'iso',sys:only('estructura'),x:false,e:55,hl:'head'},
+ {t:'Pistón, biela y cigüeñal',p:['La combustión empuja el pistón hacia abajo. La biela transmite esa fuerza al cigüeñal, que la convierte en giro.','Observa que el pistón no se mueve como un seno puro: la biela hace que el movimiento sea más rápido cerca del punto muerto superior.'],v:'front',sys:only('moviles','cigueñal'),x:true,e:0,hl:'rod1'},
+ {t:'Ciclo de cuatro tiempos',p:['Cada cilindro completa 4 tiempos en 2 vueltas de cigüeñal (720°): admisión (cian), compresión (blanco), combustión (naranja) y escape (rojo).','Mira los colores dentro de los cilindros y la barra inferior.'],v:'side',sys:only('moviles','cigueñal','estructura'),x:true,e:0,sec:true},
+ {t:'Orden de encendido 1-5-3-6-2-4',p:['Hay una combustión cada 720° / 6 = 120° de giro. El orden 1-5-3-6-2-4 alterna extremos del motor para repartir esfuerzos en el cigüeñal.','Los chips de abajo se iluminan en ese orden.'],v:'top',sys:only('moviles','cigueñal','estructura'),x:true,e:0,slow:true},
+ {t:'Distribución (valve train)',p:['El árbol de levas gira a la mitad de velocidad que el cigüeñal. Sus levas suben las varillas, los balancines invierten el movimiento y empujan las válvulas hacia abajo para abrirlas.','Apertura simplificada para fines didácticos.'],v:'iso',sys:only('distribucion','cigueñal','moviles'),x:true,e:0,hl:'rock1'},
+ {t:'Sistema de combustible',p:['Depósito → filtro → bomba de combustible → placa de refrigeración del ECM → galería de la culata → inyectores. El sobrante vuelve al depósito.','Ruta según el diagrama de la pág. 196.'],v:'iso',sys:only('combustible','estructura','accesorios'),x:true,e:0,hl:'fuelpump'},
+ {t:'Lubricación',p:['La bomba aspira aceite del cárter, lo pasa por enfriador y filtros y lo envía a la galería principal. Desde ahí llega a los cojinetes del cigüeñal, al árbol de levas y a los balancines, y vuelve por gravedad al cárter.','Ruta según el diagrama de la pág. 199.'],v:'iso',sys:only('lubricacion','estructura','cigueñal'),x:true,e:0,hl:'oilfilter'},
+ {t:'Refrigeración',p:['La bomba de agua impulsa el refrigerante por el bloque y la culata. El termostato decide si vuelve a la bomba o pasa al intercambiador.','En marino, el agua de mar (azul oscuro) enfría el aftercooler y el intercambiador por un circuito separado, y se descarga por el escape.'],v:'iso',sys:only('refrigeracion','aguamar','estructura','turbo'),x:true,e:0,hl:'hx'},
+ {t:'Turbocompresor',p:['1) Los gases de escape mueven la turbina. 2) Un eje común transmite el giro. 3) El eje mueve el compresor. 4) El compresor comprime el aire de admisión.','La velocidad de giro mostrada es solo visual.'],v:'side',sys:only('turbo','escape','admision','estructura'),x:false,e:0,hl:'turbo',cam:[V(-900,1100,1500),V(-380,700,230)]},
+ {t:'Aftercooler',p:['El aire sale caliente del compresor. El aftercooler lo enfría antes del colector de admisión: el aire frío es más denso y entra más oxígeno en cada cilindro.'],v:'iso',sys:only('turbo','admision','aguamar','estructura'),x:true,e:0,hl:'aftercooler',cam:[V(600,1300,-1900),V(-100,560,-250)]},
+ {t:'Escape',p:['Cilindros → colector de escape refrigerado → turbina → codo de escape húmedo, donde se mezcla con el agua de mar de descarga.'],v:'side',sys:only('escape','turbo','estructura'),x:true,e:0,hl:'exhman'},
+ {t:'Sistemas auxiliares',p:['Alternador (electricidad), motor de arranque (engrana con el volante), ECM (control electrónico) y compresor de aire (217 × 142 × 216 mm en la versión de 18,7 CFM).'],v:'iso',sys:ALL,x:false,e:35,hl:'aircomp'},
+ {t:'Resumen',p:['Aire → turbo → aftercooler → cilindros. Combustible → inyectores. Combustión → pistón → biela → cigüeñal → volante. Gases → turbina → escape. Aceite y refrigerante mantienen todo lubricado y a temperatura.','Haz el cuestionario de la pestaña Aprender para comprobar lo aprendido.'],v:'reset',sys:ALL,x:false,e:0},
+];
+function setSys(arr){const on=Array.isArray(arr)?arr:Object.keys(arr).filter(k=>arr[k]); for(const k in S.sys)S.sys[k]=on.includes(k); syncSys(); applyVisibility();}
+function tourGo(i){
+  S.tour=i; const box=$('#tour');
+  if(i<0||i>=TOUR.length){box.hidden=true; S.tour=-1; return;}
+  const s=TOUR[i]; box.hidden=false;
+  box.innerHTML=`<div class="step">PASO ${i+1} / ${TOUR.length}</div><h2>${s.t}</h2>${s.p.map(x=>`<p>${x}</p>`).join('')}
+   <div class="row" style="margin-top:10px"><button class="btn" id="tPrev" ${i===0?'disabled':''}>Anterior</button><button class="btn primary" id="tNext">${i===TOUR.length-1?'Terminar':'Siguiente'}</button><button class="btn" id="tExit" style="margin-left:auto">Salir</button></div>`;
+  $('#tPrev').onclick=()=>tourGo(i-1); $('#tNext').onclick=()=>tourGo(i===TOUR.length-1?-1:i+1); $('#tExit').onclick=()=>tourGo(-1);
+  setSys(s.sys); S.xray=!!s.x; $('#xray').checked=S.xray;
+  S.sec=!!s.sec; $('#secOn').checked=S.sec; if(s.sec){S.axis='z';S.secPos=0;$('#secPos').value=0;document.querySelectorAll('[data-axis]').forEach(x=>x.classList.toggle('on',x.dataset.axis==='z'));applySection();}
+  applyMaterials(); S.explode=s.e; $('#explode').value=s.e; $('#explodeVal').textContent=s.e+' %'; applyExplode();
+  if(s.slow){S.rpm=6;$('#speed').value=6;$('#rpm').textContent=6;} else if(S.rpm<10){S.rpm=20;$('#speed').value=20;$('#rpm').textContent=20;}
+  setPlay(true);
+  const v=s.cam||VIEWS[s.v]; flyTo(v[0],v[1],1200);
+  if(s.hl&&parts[s.hl]){select(s.hl);} else select(null);
+  if(window.innerWidth<=900)$('#panel').classList.remove('open');
+}
+const GLOS=[['Bloque motor','Engine block','Estructura que aloja cilindros y cigüeñal.'],['Culata','Cylinder head','Cierra los cilindros; contiene válvulas e inyectores.'],['Pistón','Piston','Recibe la presión de la combustión.'],['Biela','Connecting rod','Une pistón y cigüeñal.'],['Cigüeñal','Crankshaft','Convierte el movimiento lineal en giro.'],['Muñequilla','Crankpin','Zona del cigüeñal donde se apoya la biela.'],['PMS','Top Dead Center, TDC','Punto más alto del pistón.'],['PMI','Bottom Dead Center, BDC','Punto más bajo del pistón.'],['Árbol de levas','Camshaft','Abre las válvulas en el momento justo; gira a media velocidad.'],['Válvula de admisión','Intake valve','Deja entrar el aire.'],['Válvula de escape','Exhaust valve','Deja salir los gases.'],['Inyector','Fuel injector','Pulveriza el combustible en el cilindro.'],['Turbocompresor','Turbocharger','Usa el escape para comprimir el aire de admisión.'],['Turbina','Turbine','Lado del turbo movido por los gases de escape.'],['Compresor','Compressor','Lado del turbo que comprime el aire.'],['Aftercooler','Aftercooler','Enfría el aire comprimido antes de los cilindros.'],['Intercambiador de calor','Heat exchanger','Pasa calor del refrigerante al agua de mar.'],['Cárter','Oil pan','Depósito de aceite.'],['ECM','Electronic Control Module','Ordenador que controla la inyección.'],['Orden de encendido','Firing order','Secuencia de combustiones: 1-5-3-6-2-4.'],['Carrera','Stroke','Recorrido del pistón: 147 mm.'],['Diámetro','Bore','Diámetro del cilindro: 125 mm.'],['Cilindrada','Displacement','Volumen barrido total: 10,8 L.'],['Bomba de agua','Water pump','Hace circular el refrigerante.'],['Bomba de agua de mar','Sea water pump','Aspira agua exterior para enfriar.'],['Amortiguador de vibraciones','Vibration damper','Reduce vibraciones de torsión del cigüeñal.']];
+const QUIZ=[
+ ['¿Cuántos cilindros tiene el QSM11 y cómo están dispuestos?',['6 en V','6 en línea','8 en V','4 en línea'],1,'Son 6 cilindros en línea (pág. 361).'],
+ ['¿Cuál es el diámetro (bore) del cilindro?',['115 mm','125 mm','135 mm','147 mm'],1,'125 mm. 147 mm es la carrera.'],
+ ['¿Cuál es la carrera (stroke)?',['125 mm','137 mm','147 mm','160 mm'],2,'147 mm: el pistón sube y baja esa distancia.'],
+ ['¿Cuál es la cilindrada?',['8,3 L','10,8 L','11,9 L','15 L'],1,'10,8 L (659 pulgadas cúbicas).'],
+ ['¿Cuál es el orden de encendido?',['1-2-3-4-5-6','1-4-2-6-3-5','1-5-3-6-2-4','1-6-2-5-3-4'],2,'1-5-3-6-2-4 (pág. 361).'],
+ ['¿Hacia dónde gira el cigüeñal, visto desde el frente?',['Antihorario','Horario','Alterna','Depende de la carga'],1,'Horario, visto desde el frente del motor.'],
+ ['¿Cuántos grados de cigüeñal dura un ciclo completo de 4 tiempos?',['180°','360°','540°','720°'],3,'720°: dos vueltas completas.'],
+ ['¿Cada cuántos grados hay una combustión en este motor?',['60°','90°','120°','180°'],2,'720° / 6 cilindros = 120°.'],
+ ['¿Qué pieza convierte el movimiento lineal del pistón en giro?',['Árbol de levas','Biela y cigüeñal','Turbo','Volante'],1,'La biela transmite la fuerza y el cigüeñal la convierte en giro.'],
+ ['¿Qué mueve la turbina del turbocompresor?',['Una correa','El aceite','Los gases de escape','El aire de admisión'],2,'Los gases de escape; un eje común mueve el compresor.'],
+ ['¿Para qué sirve el aftercooler?',['Calentar el combustible','Enfriar el aire de admisión','Filtrar el aceite','Enfriar los gases de escape'],1,'Enfría el aire comprimido para que sea más denso.'],
+ ['En la versión marina, ¿qué enfría al refrigerante del motor en el intercambiador?',['Aire','Aceite','Agua de mar','Combustible'],2,'El agua de mar, por un circuito separado.'],
+];
+let qi=0,qs=0,qWrong=[];
+function renderLearn(){
+  $('#tab-aprender').innerHTML=`<h2>Aprender el QSM11</h2><p class="small">Recorrido guiado de 15 pasos: la cámara, los sistemas visibles y la animación cambian solos en cada paso.</p>
+   <button class="btn primary" id="tourStart">Empezar recorrido</button>
+   <h3>Cuestionario</h3><div id="quiz"></div>
+   <h3>Glosario</h3><dl class="kv">${GLOS.map(g=>`<dt><b style="color:var(--fg)">${g[0]}</b><br><span class="en small">${g[1]}</span></dt><dd style="font-family:var(--f-body)">${g[2]}</dd>`).join('')}</dl>`;
+  $('#tourStart').onclick=()=>tourGo(0); renderQuiz();
+}
+function renderQuiz(){
+  const el=$('#quiz');
+  if(qi>=QUIZ.length){const pc=Math.round(qs/QUIZ.length*100);
+    el.innerHTML=`<p><b style="font:700 26px var(--f-display)">${qs} / ${QUIZ.length}</b> · ${pc} %</p>${qWrong.length?`<p class="small">Repasa: ${qWrong.join(' · ')}</p>`:'<p class="small">Sin errores.</p>'}<button class="btn primary" id="qAgain">Repetir</button>`;
+    $('#qAgain').onclick=()=>{qi=0;qs=0;qWrong=[];renderQuiz();}; return;}
+  const q=QUIZ[qi];
+  el.innerHTML=`<div class="small">Pregunta ${qi+1} de ${QUIZ.length}</div><p><b>${q[0]}</b></p><div class="grid2">${q[1].map((o,k)=>`<button class="btn" data-q="${k}">${o}</button>`).join('')}</div><div id="qfb"></div>`;
+  el.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{
+    const k=+b.dataset.q, ok=k===q[2]; if(ok)qs++; else qWrong.push(q[0].replace(/^¿|\?$/g,''));
+    el.querySelectorAll('[data-q]').forEach(x=>{x.disabled=true; if(+x.dataset.q===q[2])x.classList.add('on');});
+    $('#qfb').innerHTML=`<div class="note ${ok?'':'warn'}">${ok?'Correcto.':'Incorrecto.'} ${q[3]}</div><button class="btn primary" id="qNext">Siguiente</button>`;
+    $('#qNext').onclick=()=>{qi++;renderQuiz();};
+  });
+}
+
+/* ================= ETIQUETAS 3D ================= */
+const LBL=[['FRENTE · FRONT','dir-front',V(900,FLOOR,0)],['POSTERIOR · REAR','dir-rear',V(-900,FLOOR,0)],['ADMISIÓN · INTAKE','dir-in',V(0,FLOOR,-620)],['ESCAPE · EXHAUST','dir-ex',V(0,FLOOR,620)]];
+for(let c=1;c<=6;c++)LBL.push([String(c),'cyl',V(XC(c),COVER_TOP+60,0)]);
+const lblEls=LBL.map(l=>{const d=document.createElement('div');d.className='lbl '+l[1];d.textContent=l[0];$('#labels').appendChild(d);return d;});
+const tmpV=new T.Vector3();
+function updateLabels(w,h){
+  LBL.forEach((l,i)=>{const e=lblEls[i]; if(!S.labels){e.style.display='none';return;}
+    tmpV.copy(l[2]); if(l[1]==='cyl')tmpV.y+=G.cover.position.y; tmpV.project(camera);
+    if(tmpV.z>1){e.style.display='none';return;} e.style.display='block'; e.style.left=((tmpV.x+1)/2*w)+'px'; e.style.top=((1-tmpV.y)/2*h)+'px';});
+}
+
+/* ================= GIZMO XYZ ================= */
+const gScene=new T.Scene(), gCam=new T.OrthographicCamera(-1.6,1.6,1.6,-1.6,0.1,10);
+gScene.add(new T.AxesHelper(1.1));
+function axisLabel(txt,col,pos){const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');x.fillStyle=col;x.font='bold 40px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(txt,32,34);
+  const s=new T.Sprite(new T.SpriteMaterial({map:new T.CanvasTexture(c),depthTest:false}));s.position.copy(pos);s.scale.set(.5,.5,.5);gScene.add(s);}
+axisLabel('X','#ff6b6b',V(1.35,0,0));axisLabel('Y','#7ee07e',V(0,1.35,0));axisLabel('Z','#6ba8ff',V(0,0,1.35));
+
+/* ================= BUCLE ================= */
+function resize(){const w=stage.clientWidth,h=stage.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();}
+window.addEventListener('resize',resize);
+let last=performance.now(), turboA=0;
+function loop(now){
+  requestAnimationFrame(loop);
+  const dt=Math.max(0,Math.min(.05,(now-last)/1000)); last=now;
+  if(S.playing){S.theta+=S.rpm*6*dt; if(S.theta>=720)S.theta-=720;}
+  if(fly){const t=Math.min(1,(now-fly.s)/fly.d), e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2; camera.position.lerpVectors(fly.p0,fly.p1,e); controls.target.lerpVectors(fly.t0,fly.t1,e); if(t>=1)fly=null;}
+  controls.update();
+  kinematics();
+  const flowSpeed=(S.playing?Math.max(.25,S.rpm/20):0.08)*S.pspeed;
+  turboA+=dt*(S.playing?6+S.rpm*.6:.3); turboWheels.forEach(w=>w.rotation.x=turboA);
+  for(const s in flowObjs){const o=flowObjs[s]; if(!o.pts.visible)continue; const a=o.pts.geometry.attributes.position.array;
+    o.parts.forEach((p,i)=>{p.t+=dt*flowSpeed*90/p.f.c.getLength(); p.t=p.t-Math.floor(p.t); p.f.c.getPointAt(p.t,tmpV); a[i*3]=tmpV.x;a[i*3+1]=tmpV.y;a[i*3+2]=tmpV.z;});
+    o.pts.geometry.attributes.position.needsUpdate=true;}
+  const w=stage.clientWidth,h=stage.clientHeight;
+  renderer.setViewport(0,0,w,h); renderer.setScissorTest(false); renderer.clear(); renderer.render(scene,camera);
+  const gs=Math.min(100,w*.22), gx=12, gy=(window.innerWidth<=900?170:190);
+  gCam.position.copy(camera.position).sub(controls.target).setLength(4); gCam.lookAt(0,0,0);
+  renderer.clearDepth(); renderer.setScissorTest(true); renderer.setScissor(gx,gy,gs,gs); renderer.setViewport(gx,gy,gs,gs); renderer.render(gScene,gCam); renderer.setScissorTest(false);
+  updateLabels(w,h); updateHud();
+}
+
+/* ================= INICIO ================= */
+syncSys(); renderPart(); renderDatos(); renderLearn(); applySection(); applyMaterials(); applyExplode();
+resize(); controls.target.copy(VIEWS.reset[1]); camera.position.copy(VIEWS.reset[1]).add(VIEWS.reset[0].clone().sub(VIEWS.reset[1]).multiplyScalar(fitK()));
+requestAnimationFrame(loop);
+window.__qsm={S,parts,pistons,phaseOf,PHI,XC,count:()=>({pistons:Object.keys(pistons).length,rods:Object.keys(rods).length,valves:valves.length*2})};
+})();
+</script>
+</body>
+</html>
