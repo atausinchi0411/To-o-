@@ -21,6 +21,10 @@
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
+#flowleg{position:fixed;z-index:5;left:16px;top:calc(env(safe-area-inset-top,0px) + 118px);display:flex;flex-direction:column;gap:5px;background:rgba(10,13,17,.78);border:1px solid var(--line);border-radius:6px;padding:8px 10px;font:600 12px/1.2 var(--f-body);pointer-events:none}
+#flowleg span{display:flex;align-items:center;gap:8px}
+#flowleg i{width:13px;height:13px;border-radius:50%;box-shadow:0 0 0 2px #000,0 0 8px currentColor;display:inline-block}
+@media (max-width:900px){#flowleg{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 175px);left:8px;font-size:11px}}
 html,body{height:100%;margin:0}
 body{background:var(--bg);color:var(--fg);font:14px/1.45 var(--f-body);overflow:hidden}
 #stage{position:fixed;inset:0;background:radial-gradient(120% 90% at 40% 35%,#1c2530 0%,#11161c 55%,#0b0e12 100%)}
@@ -254,6 +258,7 @@ table.spec td.num{text-align:right;white-space:normal;color:var(--fg)}
   <button id="qCut" title="Cortar el motor por la mitad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18" stroke-dasharray="3 2"/></svg><span>Corte</span></button>
   <button id="qTour" title="Recorrido guiado"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5l11 7-11 7z"/></svg><span>Recorrido</span></button>
 </div>
+<div id="flowleg" hidden></div>
 <div id="tour" hidden></div>
 <div id="mview" hidden role="dialog" aria-label="Página del manual">
   <div id="mvbar"><button class="btn" id="mvprev">◂</button><span id="mvlab"></span><button class="btn" id="mvnext">▸</button>
@@ -567,10 +572,12 @@ for(let c=1;c<=6;c++) route('escape',[Bv(XC(c),20,DECK-10),Bv(XC(c),-60,DECK+30)
 route('escape',[Bv(473-70,-275,DECK+15),Bv(-403,-278,DECK+15),Bv(-411,-300,DECK+60),Bv(TX+65,TY+45,TZ-120),Bv(TX+60,TY+40,TZ-70),Bv(TX+55,TY,TZ),Bv(TX+150,TY,TZ),Bv(TX+210,TY,TZ),Bv(TX+240,TY-20,TZ+80),Bv(TX+250,TY-30,TZ+230),Bv(TX+250,TY-30,TZ+420)],true,1.3);
 // Aire comprimido
 route('aire',[Bv(-323,255,428),Bv(-400,330,428),Bv(-450,450,300),Bv(-300,560,150)],true);
-const PCOL={combustible:0xff8a2a,lubricacion:0xf2d23c,refrigeracion:0x3d8bff,admision:0x4fe3f0,escape:0xff4a3d,aire:0xc9b6ff};
+const PCOL={combustible:0xff8f1f,lubricacion:0xffe23a,refrigeracion:0x3f9dff,admision:0x4fe3f0,escape:0xff4a3d,aire:0xc9b6ff};
 const flowG=new T.Group(); scene.add(flowG);
-const dotTex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');const g=x.createRadialGradient(32,32,0,32,32,32);
-  g.addColorStop(0,'rgba(255,255,255,1)');g.addColorStop(.35,'rgba(255,255,255,.85)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64);
+const dotTex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d');
+  x.beginPath();x.arc(32,32,29,0,7);x.fillStyle='rgba(0,0,0,.85)';x.fill();
+  const g=x.createRadialGradient(32,32,0,32,32,23);g.addColorStop(0,'#fff');g.addColorStop(.55,'#fff');g.addColorStop(1,'rgba(255,255,255,.9)');
+  x.beginPath();x.arc(32,32,22,0,7);x.fillStyle=g;x.fill();
   const t=new T.CanvasTexture(c); t.encoding=T.sRGBEncoding; return t;})();
 const flowObjs={};
 for(const s in FLOWS){
@@ -581,9 +588,18 @@ for(const s in FLOWS){
   flowG.add(o.pipes);
   let n=0; FLOWS[s].forEach(f=>{const k=Math.max(4,Math.round(f.c.getLength()/38*f.w)); for(let i=0;i<k;i++){o.parts.push({f,t:Math.random()});n++;}});
   const geo=new T.BufferGeometry(); geo.setAttribute('position',new T.BufferAttribute(new Float32Array(n*3),3));
-  const ptm=new T.PointsMaterial({color:PCOL[s],size:22,map:dotTex,transparent:true,depthWrite:false,blending:T.AdditiveBlending,sizeAttenuation:true});
+  const ptm=new T.PointsMaterial({color:PCOL[s],size:44,map:dotTex,transparent:true,alphaTest:.05,depthWrite:false,depthTest:false,sizeAttenuation:true});
   ptm.userData={fx:true}; allMats.push(ptm);
-  o.pts=new T.Points(geo,ptm); o.pts.frustumCulled=false; flowG.add(o.pts);
+  o.pts=new T.Points(geo,ptm); o.pts.frustumCulled=false; o.pts.renderOrder=12; flowG.add(o.pts);
+  // estela: 3 copias que siguen a cada partícula, más pequeñas y transparentes
+  o.tails=[1,2,3].map(j=>{const g2=new T.BufferGeometry(); g2.setAttribute('position',new T.BufferAttribute(new Float32Array(n*3),3));
+    const m2=new T.PointsMaterial({color:PCOL[s],size:44*(1-j*.2),map:dotTex,transparent:true,opacity:.75-j*.18,alphaTest:.05,depthWrite:false,depthTest:false,sizeAttenuation:true});
+    m2.userData={fx:true}; allMats.push(m2); const pt=new T.Points(g2,m2); pt.frustumCulled=false; pt.renderOrder=11; flowG.add(pt); return pt;});
+  // trazado del circuito como línea tenue
+  o.lines=new T.Group(); const lm=new T.LineBasicMaterial({color:PCOL[s],transparent:true,opacity:.45,depthTest:false,depthWrite:false});
+  lm.userData={fx:true}; allMats.push(lm);
+  FLOWS[s].forEach(f=>{const l=new T.Line(new T.BufferGeometry().setFromPoints(f.c.getPoints(Math.max(12,Math.round(f.c.getLength()/20)))),lm); l.renderOrder=10; o.lines.add(l);});
+  flowG.add(o.lines);
   flowObjs[s]=o;
 }
 
@@ -1234,7 +1250,8 @@ function applyVisibility(){
   for(const id in parts){parts[id].visible=!!S.sys[PI_[id].sys];}
   for(let c=1;c<=6;c++){gas[c].visible=S.sys.moviles; spray[c].visible=S.sys.combustible;}
   const flowsOn=S.explode<2;
-  for(const s in flowObjs){const on=flowsOn&&S.sys[s]&&S.xray; flowObjs[s].pipes.visible=false; flowObjs[s].pts.visible=on&&S.particles;}
+  let anyF=false; for(const s in flowObjs){const on=flowsOn&&S.sys[s]&&S.xray&&S.particles, o=flowObjs[s]; o.pipes.visible=false; o.pts.visible=on; o.lines.visible=on; o.tails.forEach(t=>t.visible=on); if(on)anyF=true;}
+  const fl=document.getElementById('flowleg'); if(fl){ fl.hidden=!anyF; fl.innerHTML=Object.keys(flowObjs).filter(s=>flowObjs[s].pts.visible).map(s=>`<span><i style="background:#${PCOL[s].toString(16).padStart(6,'0')}"></i>${SYS[s]?SYS[s].n:s}</span>`).join(''); }
 }
 function applyExplode(){const k=S.explode/100; for(const g in G){G[g].position.copy(G[g].userData.base).addScaledVector(G[g].userData.ex,k);} applyVisibility();}
 
@@ -1526,8 +1543,10 @@ function loop(now){
   turboA+=dt*(S.playing?6+S.rpm*.6:.3); turboWheels.forEach(w=>w.rotation.x=turboA);
   if(parts.ventilador) parts.ventilador.rotation.x=-S.theta*D2R*190.7/190;
   for(const s in flowObjs){const o=flowObjs[s]; if(!o.pts.visible)continue; const a=o.pts.geometry.attributes.position.array;
-    o.parts.forEach((p,i)=>{p.t+=dt*flowSpeed*90/p.f.c.getLength(); p.t=p.t-Math.floor(p.t); p.f.c.getPointAt(p.t,tmpV); a[i*3]=tmpV.x;a[i*3+1]=tmpV.y;a[i*3+2]=tmpV.z;});
-    o.pts.geometry.attributes.position.needsUpdate=true;}
+    const ta=o.tails.map(t=>t.geometry.attributes.position.array);
+    o.parts.forEach((p,i)=>{const len=p.f.c.getLength(); p.t+=dt*flowSpeed*90/len; p.t=p.t-Math.floor(p.t); p.f.c.getPointAt(p.t,tmpV); a[i*3]=tmpV.x;a[i*3+1]=tmpV.y;a[i*3+2]=tmpV.z;
+      for(let j=0;j<3;j++){let tt=p.t-(j+1)*16/len; if(tt<0)tt+=1; p.f.c.getPointAt(tt,tmpV); ta[j][i*3]=tmpV.x;ta[j][i*3+1]=tmpV.y;ta[j][i*3+2]=tmpV.z;}});
+    o.pts.geometry.attributes.position.needsUpdate=true; o.tails.forEach(t=>t.geometry.attributes.position.needsUpdate=true);}
   const w=stage.clientWidth,h=stage.clientHeight;
   renderer.setViewport(0,0,w,h); renderer.setScissorTest(false); renderer.clear(); renderer.render(scene,camera);
   const gs=Math.min(100,w*.22), gx=12, gy=(window.innerWidth<=900?170:190);
