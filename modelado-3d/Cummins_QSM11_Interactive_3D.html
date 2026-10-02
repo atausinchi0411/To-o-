@@ -1350,7 +1350,7 @@ $('#panelToggle').onclick=()=>{$('#panel').classList.toggle('open'); setTimeout(
 // Cámara
 const VIEWS={front:[V(2600,320,0),V(0,240,0)],rear:[V(-2600,320,0),V(0,240,0)],side:[V(0,320,2900),V(0,240,0)],top:[V(1,3200,0),V(0,150,0)],iso:[V(1900,1250,2100),V(0,220,0)],reset:[V(2100,1150,2300),V(0,220,0)]};
 let fly=null;
-function fitK(){const a=camera.aspect; return a<1?1.15/Math.pow(a,.75):(a<1.3?1.15:1);}
+function fitK(){const v=visBox(); const fx=Math.max(.25,(v.w-v.occX)/v.w), fy=Math.max(.25,(v.h-v.occY-v.occT)/v.h), a=(v.w-v.occX)/Math.max(200,v.h-v.occY-v.occT); const base=a<1?1.15/Math.pow(a,.75):(a<1.3?1.15:1); return base*Math.max(1,.62/Math.min(fx,fy));}
 function flyTo(pos,tgt,ms=900){pos=tgt.clone().add(pos.clone().sub(tgt).multiplyScalar(fitK())); fly={p0:camera.position.clone(),t0:controls.target.clone(),p1:pos,t1:tgt.clone(),s:performance.now(),d:matchMedia('(prefers-reduced-motion: reduce)').matches?1:ms};}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{const v=VIEWS[b.dataset.view]; flyTo(v[0],v[1]);});
 
@@ -1543,11 +1543,16 @@ axisLabel('X','#ff6b6b',V(1.35,0,0));axisLabel('Y','#7ee07e',V(0,1.35,0));axisLa
 /* ================= BUCLE ================= */
 function resize(){const w=stage.clientWidth,h=stage.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h; applyViewOffset();}
 // En pantallas angostas el panel y la barra tapan la parte baja: se desplaza la vista para centrar el motor en lo que queda visible
+function visBox(){ // zona del visor que no tapan el panel ni la barra de animación
+  const w=stage.clientWidth,h=stage.clientHeight, pn=document.getElementById('panel'), tr=document.getElementById('transport');
+  let occX=0, occY=tr.offsetHeight+16, occT=0;
+  if(window.innerWidth<=900){ occY=(pn.classList.contains('open')?pn.offsetHeight:0)+tr.offsetHeight+18; occT=84; }
+  else occX=pn.offsetWidth+26;
+  return {w,h,occX,occY,occT};
+}
 function applyViewOffset(){
-  const w=stage.clientWidth,h=stage.clientHeight;
-  if(window.innerWidth<=900){ const tr=document.getElementById('transport').getBoundingClientRect(), pn=document.getElementById('panel'), open=pn.classList.contains('open');
-    const occ=open?pn.offsetHeight+tr.height+18:tr.height+10; camera.setViewOffset(w,h,0,Math.round(occ/2-10),w,h); }
-  else camera.clearViewOffset();
+  const v=visBox();
+  camera.setViewOffset(v.w,v.h,Math.round(v.occX/2),Math.round((v.occY-v.occT)/2-8),v.w,v.h);
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize',resize);
