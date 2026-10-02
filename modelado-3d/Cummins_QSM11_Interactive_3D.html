@@ -117,6 +117,9 @@ summary{cursor:pointer;font-weight:600}
 .titem.sel{background:rgba(212,176,106,.07);border-left:2px solid var(--accent)}
 .tdet{padding:4px 8px 10px 30px;font-size:13px}
 .tdet p{margin:6px 0}
+table.spec{min-width:0;width:100%;margin:6px 0}
+table.spec td{padding:5px 4px;font-size:12.5px}
+table.spec td.num{text-align:right;white-space:normal;color:var(--fg)}
 #quick{position:fixed;z-index:6;top:calc(env(safe-area-inset-top,0px) + 14px);right:398px;display:flex;flex-direction:column;gap:8px}
 #quick button{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;background:var(--panel);border:1px solid var(--line2);border-radius:6px;font:600 15px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;backdrop-filter:blur(8px)}
 #quick button:hover{border-color:var(--accent)}
@@ -568,6 +571,127 @@ for(const s in FLOWS){
   flowObjs[s]=o;
 }
 
+/* ================= DATOS DE DIAGNÓSTICO (manual O&M, sección TS, págs. TS-3 a TS-57) ================= */
+const K={
+ FC:{c:'Hay códigos de falla activos',f:'Leer los códigos activos (procedimiento 101-007, Sección 1). Si hay códigos activos, contactar a un taller autorizado Cummins.',p:'ecm'},
+ FUELQ:{c:'Combustible de grado incorrecto o de mala calidad',f:'Operar desde un tanque con combustible de buena calidad (procedimiento 018-002, Sección V).',p:'filtro_combustible'},
+ FFILT:{c:'Filtro de combustible o línea de succión obstruidos',f:'Cambiar el filtro de combustible (procedimiento 006-015) y revisar la restricción de la línea de succión.',p:'filtro_combustible'},
+ AIRR:{c:'Restricción de admisión sobre la especificación',f:'Limpiar o cambiar el filtro de aire y la tubería de entrada (procedimiento 010-059). Límite industrial: 635 mm H₂O con filtro sucio.',p:'codo_filtro_aire'},
+ LEAKS:{c:'Fugas de admisión o de escape',f:'Revisar conexiones sueltas o dañadas y tapones faltantes. Revisar el montaje del turbo y del colector de escape (procedimiento 010-024).',p:'colector_escape'},
+ AIRFUEL:{c:'Aire en el sistema de combustible',f:'Apretar o cambiar conexiones, líneas, tubo de succión del tanque y filtros.',p:'tuberia_combustible'},
+ LOWAMB:{c:'El motor trabaja a baja temperatura ambiente',f:'Revisar la cortina de invierno, las persianas y la toma de aire bajo el capó. En frío usar aire de bajo el capó (procedimiento 101-015).',p:'ventilador'},
+ OVH:{c:'Ajuste de válvulas e inyectores incorrecto',f:'Medir y ajustar (overhead set, procedimiento 003-004, Sección 5).',p:'tapa_balancines'},
+ INLET:{c:'Restricción en la entrada de combustible',f:'Revisar la restricción de entrada (máximo industrial 203 mm Hg con filtro sucio) y contactar a un taller autorizado Cummins.',p:'bomba_combustible'},
+ SHUT:{c:'Válvula de corte de combustible cerrada',f:'Revisar cables sueltos y que llegue alimentación al solenoide de la válvula de corte.',p:'valvula_corte'},
+ OILHI:{c:'Nivel de aceite sobre lo especificado',f:'Revisar el nivel, la calibración de la varilla y la capacidad del cárter. Corregir el nivel (procedimiento 007-043).',p:'carter'},
+ OILLVL:{c:'Nivel de aceite alto o bajo',f:'Agregar o drenar aceite (procedimiento 007-043).',p:'carter'},
+ OILSPEC:{c:'El aceite no cumple la especificación para las condiciones de uso',f:'Cambiar aceite y filtros (procedimientos 007-002 y 007-013) con el aceite recomendado en la Sección V.',p:'filtros_aceite'},
+ MOUNTS:{c:'Soportes del motor gastados, dañados o incorrectos',f:'Revisar los soportes del motor (manual del fabricante del equipo).',p:'soporte_delantero'},
+ DAMPER:{c:'Amortiguador de vibraciones dañado',f:'Inspeccionar el amortiguador viscoso (procedimiento 001-052, Sección 7).',p:'amortiguador_polea'},
+ EXHR:{c:'Restricción en el sistema de escape',f:'Revisar restricciones del escape. Máximo: 1016 mm H₂O (75 mm Hg) (procedimiento 018-020).',p:'codo_escape'},
+ FDRAIN:{c:'Restricción en las líneas de drenaje de combustible',f:'Despejar o cambiar líneas, válvulas de retención o ventilaciones del tanque. Máximo: 63 mm Hg.',p:'tuberia_combustible'},
+ BATT:{c:'Voltaje de batería bajo',f:'Revisar las baterías y el circuito de alimentación directa (sin llave) del ECM.',p:'motor_arranque'},
+ FUELLOW:{c:'Nivel de combustible bajo en el tanque',f:'Llenar el tanque.',p:null},
+ CRANK:{c:'Velocidad de arranque demasiado baja',f:'Si gira a menos de 150 rpm, seguir el árbol "El motor no gira o gira lento".',p:'motor_arranque'},
+ DRIVEN:{c:'Equipos accionados por el motor conectados',f:'Desconectar los equipos accionados por el motor.',p:'cubo_ventilador'},
+ TURBO:{c:'Turbocompresor incorrecto',f:'Comparar el número de parte con la lista de partes de control (CPL, boletín 3379133 o 4021327) y cambiar el turbo si corresponde (procedimiento 010-033).',p:'turbo'},
+ FINS:{c:'Aletas del enfriador de aire de carga, del radiador o del condensador dañadas u obstruidas',f:'Inspeccionar y limpiar (procedimiento 010-028).',p:'ventilador'},
+ HOSES:{c:'Manguera de refrigerante aplastada, obstruida o con fuga',f:'Inspeccionar las mangueras (procedimiento 008-086).',p:'bomba_agua'},
+ COOLLOW:{c:'Nivel de refrigerante bajo',f:'Buscar fugas externas en el motor y el sistema de refrigeración, reparar y rellenar (procedimiento 008-066).',p:'carcasa_termostato'},
+ WINTER:{c:'Cortina de invierno o cubierta del radiador cerrada',f:'Abrirla. Mantener siempre una abertura mínima de 784 cm² (unos 28 × 28 cm).',p:'ventilador'},
+ CAP:{c:'Tapa del radiador incorrecta, defectuosa o de baja presión',f:'Revisar la tapa de presión (mínimo recomendado 48 kPa).',p:'carcasa_termostato'},
+ SHROUD:{c:'Cubierta del ventilador o deflectores de recirculación dañados o faltantes',f:'Reparar, cambiar o instalar.',p:'ventilador'},
+ DRIVETRAIN:{c:'La transmisión no está bien acoplada al motor',f:'Revisar relaciones y componentes de la transmisión.',p:'volante'},
+ IDLE:{c:'Ralentí ajustado muy bajo',f:'Verificar el ajuste y subir el ralentí con el interruptor de incremento o con la herramienta electrónica.',p:'ecm'},
+ OILDRAIN:{c:'Intervalo de cambio de aceite excesivo',f:'Verificar el intervalo correcto (procedimiento 102-002, Sección 2).',p:'filtros_aceite'},
+ BREATHER:{c:'Ventilación del cárter obstruida',f:'Revisar y limpiar el respiradero y el tubo de ventilación (procedimiento 003-018).',p:'tapa_balancines'},
+ OILLEAK:{c:'Fuga externa de aceite',f:'Apretar tornillos, tapones y conexiones; cambiar juntas si es necesario (procedimiento 018-009).',p:'carter'},
+ KEY:{c:'Falla en el circuito de la llave de contacto',f:'Revisar el circuito de la llave del equipo.',p:'ecm'},
+ ACLEAK:{c:'Fugas en el sistema de aire',f:'Bloquear las ruedas y buscar fugas con los frenos de resorte aplicados y liberados: juntas del compresor, mangueras, conexiones, tanques y válvulas.',p:'compresor_aire'},
+ ACCARB:{c:'Carbón excesivo en la línea de descarga, válvulas o culata del compresor',f:'Revisar el carbón; cambiar la línea de descarga y la culata del compresor si es necesario (procedimiento 012-015).',p:'compresor_aire'},
+ X:{c:'El problema continúa',f:'Contactar a un taller autorizado Cummins.',p:null},
+};
+const S_=(k,o={})=>({...K[k],...o});
+const DIAG=[
+ {t:'Temperatura de refrigerante alta — sobrecalentamiento gradual',cat:'Temperatura',pg:'TS-11',s:[S_('COOLLOW'),S_('FINS'),S_('WINTER'),S_('HOSES'),{c:'Correa del ventilador o de la bomba de agua floja',f:'Revisar y ajustar la tensión (procedimiento 103-002).',p:'correa'},S_('OILLVL'),S_('SHROUD'),S_('CAP'),{c:'SCA sobre la especificación o refrigerante con exceso de anticongelante',f:'Revisar el nivel de SCA y la concentración de anticongelante (procedimiento 008-046).',p:'carcasa_termostato'},S_('X')]},
+ {t:'Temperatura de refrigerante alta — sobrecalentamiento súbito',cat:'Temperatura',pg:'TS-13',s:[S_('FC'),S_('COOLLOW'),S_('FINS'),S_('HOSES'),{c:'Correa del ventilador rota',f:'Cambiar la correa (procedimiento 008-002).',p:'correa'},S_('CAP'),S_('WINTER'),{c:'Líneas de llenado o de venteo obstruidas o mal ruteadas',f:'Revisar el ruteo y la restricción de las líneas.',p:'carcasa_termostato'},S_('X')]},
+ {t:'Temperatura de refrigerante bajo lo normal',cat:'Temperatura',pg:'TS-15',s:[S_('FC'),S_('LOWAMB'),{c:'Las persianas del radiador no funcionan bien',f:'Revisar su funcionamiento; reparar o cambiar.',p:'ventilador'},{c:'Indicador o sensor de temperatura de refrigerante defectuoso',f:'Probar el indicador y el sensor; reparar o cambiar.',p:'sensor_temp_refrigerante'},S_('X')]},
+ {t:'Temperatura del aire de admisión sobre la especificación',cat:'Temperatura',pg:'TS-45',s:[{c:'Velocidad del vehículo muy baja para enfriar con carga alta',f:'Reducir la carga y bajar de marcha para subir las rpm del ventilador.',p:'ventilador'},S_('SHROUD'),{c:'Correa del ventilador rota',f:'Cambiar la correa (procedimiento 103-002).',p:'correa'},S_('WINTER'),{c:'Persianas del radiador no abren por completo o termostato de persianas mal ajustado',f:'Inspeccionar; reparar o cambiar y revisar el ajuste.',p:'ventilador'},S_('FINS'),S_('X')]},
+ {t:'Temperatura de aceite sobre la especificación',cat:'Temperatura',pg:'TS-52',s:[S_('OILLVL'),{c:'Temperatura de refrigerante alta',f:'Seguir los árboles de sobrecalentamiento gradual o súbito.',p:'carcasa_termostato'},{c:'Sensor, indicador o interruptor de temperatura de aceite defectuoso o mal ubicado',f:'Revisar su funcionamiento y ubicación.',p:'sensor_aceite'},S_('X')]},
+ {t:'Potencia baja',cat:'Potencia y respuesta',pg:'TS-25',s:[S_('FC'),S_('DRIVETRAIN'),{c:'El motor opera sobre la altitud recomendada',f:'La potencia baja con la altitud; ver la hoja de datos del motor.',p:'sensor_presion_ambiente'},S_('TURBO'),S_('FFILT'),S_('OILHI'),S_('AIRR'),S_('LEAKS'),S_('AIRFUEL'),S_('FDRAIN'),S_('FUELQ'),{c:'Temperatura del aire de admisión sobre la especificación',f:'Seguir el árbol "Temperatura del aire de admisión".',p:'sensor_temp_admision'},{c:'Temperatura del combustible de entrada sobre la especificación (máx. 71 °C)',f:'Llenar el tanque, apagar o puentear los calentadores de combustible y revisar el enfriador de combustible.',p:'bomba_combustible'},S_('X')]},
+ {t:'Aceleración o respuesta pobre',cat:'Potencia y respuesta',pg:'TS-17',s:[S_('FC'),S_('LOWAMB'),S_('LEAKS'),{c:'Temperatura del combustible sobre la especificación',f:'Llenar los tanques y apagar o puentear el calentador de combustible.',p:'bomba_combustible'},S_('FUELQ'),S_('DRIVETRAIN'),S_('X')]},
+ {t:'El motor desacelera lento',cat:'Potencia y respuesta',pg:'TS-18',s:[S_('FC'),{c:'Pedal o palanca del acelerador pegado',f:'Revisar el acelerador (manual del fabricante del equipo).',p:'ecm'},S_('X')]},
+ {t:'No alcanza las rpm nominales',cat:'Potencia y respuesta',pg:'TS-39',s:[S_('KEY'),{c:'Tacómetro descalibrado o defectuoso',f:'Comparar con un tacómetro manual o con la herramienta electrónica; calibrar o cambiar.',p:'sensor_velocidad_volante'},S_('FC'),S_('DRIVETRAIN'),{c:'Potencia baja',f:'Seguir el árbol "Potencia baja".',p:null},S_('FUELQ'),S_('INLET'),S_('OVH'),{c:'Equipo sobrecargado',f:'Cargar el equipo correctamente.',p:null},{c:'Parámetros programables o funciones seleccionadas incorrectos',f:'Revisarlos y reprogramarlos con la herramienta electrónica.',p:'ecm'},S_('X')]},
+ {t:'Velocidad oscila en ralentí bajo o alto',cat:'Potencia y respuesta',pg:'TS-32',s:[S_('FC'),S_('FUELLOW'),S_('X')]},
+ {t:'Velocidad oscila bajo carga',cat:'Potencia y respuesta',pg:'TS-33',s:[S_('FC'),S_('FUELLOW'),S_('X')]},
+ {t:'PTO o control crucero no funciona',cat:'Potencia y respuesta',pg:'TS-54',s:[{c:'Interruptor de PTO o crucero apagado',f:'Encender el interruptor.',p:null},{c:'Cables o conectores del interruptor flojos',f:'Revisar los interruptores de PTO, selector, embrague y freno, y sus conexiones.',p:'mazo_cables'},S_('FC'),S_('X')]},
+ {t:'Difícil de arrancar o no arranca — con humo en el escape',cat:'Arranque y parada',pg:'TS-19',s:[S_('FC'),S_('BATT'),S_('DRIVEN'),S_('CRANK'),{c:'Válvula de corte de combustible cerrada',f:'Revisar la válvula de corte y su circuito; contactar a un taller autorizado.',p:'valvula_corte'},{c:'Fusibles defectuosos',f:'Cambiar los fusibles del arnés de interfaz del equipo.',p:'mazo_cables'},S_('EXHR'),S_('FUELQ'),{c:'La ayuda de arranque en frío no funciona',f:'Revisar su funcionamiento (procedimiento 101-004). Arranque sin ayuda en industrial: hasta −12 °C.',p:'colector_admision'},S_('FFILT'),S_('AIRR'),S_('X')]},
+ {t:'Difícil de arrancar o no arranca — sin humo en el escape',cat:'Arranque y parada',pg:'TS-21',s:[S_('FC'),S_('FUELLOW'),{c:'El motor de arranque gira en sentido incorrecto',f:'Revisar el sentido de giro del cigüeñal; cambiar el motor de arranque si es necesario.',p:'motor_arranque'},S_('CRANK'),S_('SHUT'),{c:'Alimentación eléctrica del control electrónico baja, interrumpida o abierta',f:'Revisar conexiones de batería, fusibles y el circuito de alimentación directa.',p:'ecm'},S_('INLET'),{c:'Conexiones de combustible flojas en el lado de succión de la bomba',f:'Apretar todas las conexiones entre los tanques y la bomba.',p:'tuberia_combustible'},{c:'Tubo de succión del tanque roto',f:'Revisar y reparar el tubo de succión.',p:null},S_('FDRAIN'),S_('X')]},
+ {t:'Arranca pero no sigue funcionando',cat:'Arranque y parada',pg:'TS-34',s:[S_('FC'),{c:'Apagado por ralentí o por PTO activado',f:'Llave en OFF 5 segundos, luego ON, y revisar la lámpara de falla.',p:'ecm'},S_('FUELLOW'),S_('AIRFUEL'),S_('FFILT'),S_('DRIVEN'),{c:'El combustible se parafina por el frío',f:'Revisar el calentador de combustible; en frío puede ser necesario instalar uno.',p:'filtro_combustible'},S_('INLET'),S_('SHUT'),S_('EXHR'),S_('FUELQ'),S_('AIRR'),S_('X')]},
+ {t:'Se apaga solo o muere al desacelerar',cat:'Arranque y parada',pg:'TS-30',s:[S_('FC'),{c:'El ECM perdió la alimentación de batería',f:'Revisar conexiones de batería, fusibles y el circuito de alimentación directa.',p:'ecm'},{c:'Apagado por ralentí o por PTO activado',f:'Revisar los tiempos límite con la herramienta electrónica.',p:'ecm'},{c:'El motor no vuelve a arrancar',f:'Seguir el procedimiento de arranque normal (101-014).',p:null},S_('INLET'),S_('AIRFUEL'),S_('BATT'),{c:'Falla el sistema de protección del equipo (OEM)',f:'Aislar el sistema de protección del equipo y revisarlo.',p:null},S_('SHUT'),S_('FUELQ'),S_('X')]},
+ {t:'El motor no gira o gira lento — arranque eléctrico',cat:'Arranque y parada',pg:'TS-38',s:[{c:'Cables o conexiones de batería flojos, rotos o corroídos',f:'Revisar cables y conexiones. Caída de voltaje máxima en 24 V: 1,7 V.',p:'motor_arranque'},S_('DRIVEN'),{c:'Temperatura de aceite bajo la especificación',f:'Instalar un calentador de cárter, o drenar y llenar con aceite tibio.',p:'carter'},S_('OILSPEC'),S_('X')]},
+ {t:'El motor no gira o gira lento — arranque neumático',cat:'Arranque y parada',pg:'TS-37',s:[{c:'Presión de aire baja en los tanques',f:'Aumentar la presión con una fuente de aire externa.',p:'compresor_aire'},S_('DRIVEN'),{c:'Sensor, indicador o interruptor de temperatura de aceite defectuoso o mal ubicado',f:'Revisar su funcionamiento y ubicación.',p:'sensor_aceite'},S_('OILSPEC'),S_('OILHI'),S_('X')]},
+ {t:'El motor no se apaga',cat:'Arranque y parada',pg:'TS-41',s:[S_('KEY'),{c:'El motor funciona con gases combustibles aspirados por la admisión',f:'Localizar y aislar la fuente de los gases y reparar.',p:'codo_filtro_aire'},S_('X')]},
+ {t:'Funciona irregular en ralentí',cat:'Ruido y vibración',pg:'TS-27',s:[S_('LOWAMB'),S_('FC'),S_('MOUNTS'),S_('IDLE'),S_('AIRFUEL'),S_('FUELQ'),S_('OVH'),S_('X')]},
+ {t:'Funciona irregular o falla un cilindro',cat:'Ruido y vibración',pg:'TS-28',s:[{c:'Solo ocurre en ralentí',f:'Seguir el árbol "Funciona irregular en ralentí".',p:null},S_('LOWAMB'),S_('FC'),{c:'Fuga de combustible',f:'Revisar líneas, conexiones y filtros, y las líneas a los tanques.',p:'tuberia_combustible'},S_('FUELQ'),S_('AIRFUEL'),S_('INLET'),S_('MOUNTS'),S_('OVH'),S_('X')]},
+ {t:'Ruido excesivo',cat:'Ruido y vibración',pg:'TS-23',s:[{c:'Presión de aceite bajo la especificación',f:'Revisar la presión (mínimo 69 kPa en ralentí). Si es baja, consultar a un taller autorizado.',p:'sensor_aceite'},{c:'Aceite delgado o diluido',f:'Ver el árbol "Aceite contaminado" (procedimiento 018-003).',p:'carter'},S_('DAMPER'),{c:'Temperatura de refrigerante alta',f:'Seguir los árboles de sobrecalentamiento.',p:'carcasa_termostato'},S_('MOUNTS'),S_('X')]},
+ {t:'Golpeteo de combustión',cat:'Ruido y vibración',pg:'TS-24',s:[S_('LOWAMB'),{c:'La ayuda de arranque con éter no funciona bien',f:'Reparar o cambiar la ayuda de arranque.',p:'colector_admision'},S_('FUELQ'),S_('X')]},
+ {t:'Vibración excesiva',cat:'Ruido y vibración',pg:'TS-36',s:[S_('FC'),{c:'El motor falla (misfire)',f:'Seguir el árbol "Funciona irregular o falla un cilindro".',p:null},S_('IDLE'),{c:'Ventilador flojo, dañado o desbalanceado',f:'Revisar el ventilador (procedimiento 008-040).',p:'ventilador'},{c:'Accesorios de correa defectuosos',f:'Revisar cubo del ventilador, alternador, compresor de refrigerante y bomba hidráulica; aislarlos y probar la vibración (procedimiento 008-036).',p:'cubo_ventilador'},S_('MOUNTS'),S_('DAMPER'),S_('X')]},
+ {t:'Humo negro excesivo',cat:'Humo',pg:'TS-55',s:[{c:'Holgura de las ruedas del turbo fuera de especificación',f:'Revisar la holgura radial y axial e inspeccionar el turbo; reparar o cambiar.',p:'turbo'},S_('LEAKS'),S_('FUELQ'),S_('FDRAIN'),S_('X')]},
+ {t:'Humo blanco excesivo',cat:'Humo',pg:'TS-56',s:[S_('FC'),{c:'Calentador del bloque defectuoso',f:'Revisar la alimentación y el cableado; cambiar el calentador si es necesario.',p:'bloque'},{c:'Temperatura de refrigerante bajo la especificación',f:'Seguir el árbol "Temperatura de refrigerante bajo lo normal".',p:'sensor_temp_refrigerante'},{c:'El motor está frío',f:'Dejarlo calentar hasta la temperatura de trabajo.',p:null},S_('FUELQ'),S_('OVH'),S_('X')]},
+ {t:'Gases del cárter (blowby) excesivos',cat:'Aceite',pg:'TS-16',s:[S_('BREATHER'),S_('X')]},
+ {t:'Presión de aceite baja',cat:'Aceite',pg:'TS-50',s:[S_('FC'),S_('OILLVL'),S_('OILLEAK'),{c:'Sensor, manómetro o interruptor de presión defectuoso o mal ubicado',f:'Revisar su funcionamiento y ubicación.',p:'sensor_aceite'},S_('OILSPEC'),{c:'Aceite contaminado con refrigerante o combustible',f:'Contactar a un taller autorizado Cummins.',p:'carter'},{c:'Filtro de aceite tapado',f:'Cambiar aceite y filtro y revisar el intervalo de cambio.',p:'filtros_aceite'},{c:'Sensor de viscosidad del aceite suelto',f:'Revisar el montaje con un taller autorizado.',p:'enfriador_aceite'},S_('X')]},
+ {t:'Presión de aceite alta',cat:'Aceite',pg:'TS-49',s:[{c:'Sensor, manómetro o interruptor de presión defectuoso o mal ubicado',f:'Revisar su funcionamiento y ubicación.',p:'sensor_aceite'},{c:'Temperatura de refrigerante bajo la especificación',f:'Seguir el árbol "Temperatura de refrigerante bajo lo normal".',p:'sensor_temp_refrigerante'},S_('OILSPEC'),S_('X')]},
+ {t:'Consumo de aceite excesivo',cat:'Aceite',pg:'TS-47',s:[{c:'Confirmar el consumo real',f:'Comparar el aceite agregado contra las horas de trabajo.',p:'carter'},S_('OILLEAK'),S_('OILDRAIN'),S_('OILSPEC'),S_('BREATHER'),S_('X')]},
+ {t:'Aceite contaminado',cat:'Aceite',pg:'TS-48',s:[{c:'Identificar el contaminante',f:'Hacer un análisis de aceite.',p:'carter'},{c:'Suministro de aceite contaminado',f:'Drenar, llenar con aceite limpio y cambiar los filtros.',p:'filtros_aceite'},{c:'Lodo excesivo',f:'Seguir el árbol "Lodo en el cárter".',p:null},{c:'Combustible en el aceite',f:'Seguir el árbol "Combustible en el aceite".',p:null},S_('X')]},
+ {t:'Lodo en el cárter',cat:'Aceite',pg:'TS-51',s:[{c:'Suministro de aceite contaminado',f:'Drenar, llenar con aceite limpio y cambiar los filtros.',p:'filtros_aceite'},S_('OILSPEC'),S_('OILDRAIN'),S_('FUELQ'),{c:'Aceite contaminado con refrigerante',f:'Revisar el aceite; seguir el árbol de pérdida de refrigerante interna.',p:'enfriador_aceite'},S_('BREATHER'),S_('X')]},
+ {t:'Combustible en el aceite',cat:'Aceite',pg:'TS-44',s:[{c:'Suministro de aceite contaminado',f:'Drenar, llenar con aceite limpio y cambiar los filtros.',p:'filtros_aceite'},{c:'Tiempo de ralentí excesivo (más de 10 minutos)',f:'Apagar el motor en vez de dejarlo en ralentí. Si es necesario, subir el ralentí.',p:'ecm'},S_('X')]},
+ {t:'Aceite en el refrigerante',cat:'Refrigerante',pg:'TS-53',s:[{c:'Suministro de refrigerante contaminado',f:'Drenar, llenar con refrigerante limpio y cambiar los filtros de refrigerante (procedimientos 008-018 y 008-006).',p:'carcasa_termostato'},S_('X')]},
+ {t:'Combustible en el refrigerante',cat:'Refrigerante',pg:'TS-43',s:[{c:'Suministro de refrigerante contaminado',f:'Drenar, llenar con refrigerante limpio y cambiar los filtros de refrigerante.',p:'carcasa_termostato'},{c:'Calentador de combustible defectuoso (si tiene)',f:'Revisarlo y cambiarlo si es necesario.',p:'filtro_combustible'},S_('X')]},
+ {t:'Pérdida de refrigerante',cat:'Refrigerante',pg:'TS-10',s:[{c:'Nivel de refrigerante sobre la especificación',f:'Revisar el nivel (procedimiento 008-066).',p:'carcasa_termostato'},{c:'Sistema contaminado con suciedad, sarro o lodo',f:'Limpiar el sistema de refrigeración.',p:'bomba_agua'},S_('X')]},
+ {t:'Turbo pierde aceite o combustible',cat:'Admisión y turbo',pg:'TS-57',s:[{c:'Trabajo prolongado con poca o sin carga',f:'Revisar las instrucciones de operación (procedimiento 101-015).',p:'turbo'},{c:'Entra aceite o combustible al turbo',f:'Retirar la tubería de admisión y de escape y revisar si hay aceite o combustible.',p:'turbo'},{c:'Línea de drenaje de aceite del turbo obstruida',f:'Retirarla, limpiarla o cambiarla (procedimiento 010-033).',p:'tuberia_aceite_turbo'},S_('X')]},
+ {t:'Presión de admisión (boost) baja',cat:'Admisión y turbo',pg:'TS-46',s:[S_('TURBO'),S_('LEAKS'),{c:'Conexión del compresor de aire floja o dañada',f:'Revisar la conexión entre el colector y el compresor de aire; reparar o cambiar.',p:'compresor_aire'},S_('X')]},
+ {t:'Consumo de combustible excesivo',cat:'Combustible',pg:'TS-42',s:[{c:'Confirmar la queja',f:'Si hay potencia baja o mala aceleración, seguir esos árboles; si no, continuar.',p:null},S_('OILHI'),S_('AIRR'),{c:'Fuga de combustible',f:'Revisar líneas, conexiones y filtros, y las líneas a los tanques.',p:'tuberia_combustible'},{c:'Técnica de operación incorrecta',f:'Revisar la operación del motor (procedimiento 101-015).',p:null},{c:'Factores del equipo y del ambiente',f:'Considerar temperatura, viento, neumáticos, rutas y carga.',p:null},{c:'Horómetro descalibrado',f:'Calibrarlo o cambiarlo y recalcular el consumo.',p:'ecm'}]},
+ {t:'Alternador no carga o carga poco',cat:'Eléctrico',pg:'TS-9',s:[{c:'Correa del alternador floja',f:'Revisar la tensión de la correa (ver ficha de correas).',p:'correa'},{c:'Cables o conexiones de batería flojos, rotos o corroídos',f:'Revisar cables y conexiones.',p:'motor_arranque'},{c:'Baterías fallaron',f:'Revisar su estado y cambiarlas si es necesario (procedimiento 013-007).',p:null},{c:'Circuito eléctrico abierto',f:'Revisar fusibles, cables y conexiones con los diagramas del fabricante.',p:'mazo_cables'},{c:'Polea del alternador floja en el eje',f:'Apretar la polea.',p:'alternador'},S_('X')]},
+ {t:'Compresor de aire: la presión sube lento',cat:'Aire comprimido',pg:'TS-3',s:[{c:'Restricción de admisión del compresor excesiva',f:'Cambiar el filtro del compresor (si tiene) y revisar la tubería de entrada.',p:'compresor_aire'},S_('ACLEAK'),S_('ACCARB'),S_('X')]},
+ {t:'Compresor de aire: cicla con frecuencia',cat:'Aire comprimido',pg:'TS-4',s:[S_('ACLEAK'),S_('ACCARB'),{c:'Cartucho desecante del secador saturado',f:'Cambiar el cartucho del secador de aire.',p:null},{c:'Tiempo de bombeo excesivo',f:'Revisar el ciclo de trabajo; instalar un compresor más grande si es necesario.',p:'compresor_aire'},S_('X')]},
+ {t:'Compresor de aire: ruido excesivo',cat:'Aire comprimido',pg:'TS-5',s:[S_('ACCARB'),{c:'El compresor envía pulsos de aire a los tanques',f:'Instalar un tanque amortiguador (ping tank) entre el secador y el tanque húmedo.',p:null},{c:'Hielo en los componentes del sistema de aire',f:'Buscar hielo en puntos bajos de la descarga, entrada del secador y codos.',p:null},S_('X')]},
+ {t:'Compresor de aire: pasa aceite al sistema de aire',cat:'Aire comprimido',pg:'TS-6',s:[S_('OILDRAIN'),{c:'Restricción de admisión del compresor excesiva',f:'Cambiar el filtro del compresor y revisar la tubería de entrada (procedimiento 010-059).',p:'compresor_aire'},{c:'Tiempo de bombeo excesivo o desecante saturado',f:'Cambiar el cartucho del secador y revisar el ciclo de trabajo.',p:'compresor_aire'},S_('ACCARB'),S_('X')]},
+ {t:'Compresor de aire: no mantiene la presión',cat:'Aire comprimido',pg:'TS-7',s:[S_('ACLEAK'),S_('X')]},
+ {t:'Compresor de aire: no deja de bombear',cat:'Aire comprimido',pg:'TS-8',s:[S_('ACLEAK'),S_('X')]},
+];
+
+/* ================= FICHAS TÉCNICAS (manual O&M, Sección V) ================= */
+const SPECS={
+ aceite:{t:'Sistema de lubricación',pg:'V-3, V-19',parts:['carter','filtros_aceite','enfriador_aceite','sensor_aceite'],rows:[
+  ['Presión mínima en ralentí','69 kPa (10 psi)'],['Presión en operación','207–448 kPa (30–65 psi)'],['Presión mínima en par máximo o a 1200 rpm','207 kPa (30 psi)'],
+  ['Temperatura máxima (industrial)','121 °C'],['Capacidad del cárter industrial (bajo / alto)','26,5 / 34 L'],['Capacidad total con filtro montado','37 L'],['Capacidad total con filtro remoto','38 L'],
+  ['Torque del tapón de cárter (llave 1-1/4")','88 N·m (65 ft·lb)']]},
+ refrig:{t:'Sistema de refrigeración (industrial)',pg:'V-4',parts:['carcasa_termostato','bomba_agua','sensor_temp_refrigerante','ventilador'],rows:[
+  ['Capacidad de refrigerante del motor (sin radiador)','9,5 L'],['Termostato, rango de apertura','82–93 °C'],['Presión del bloque con termostato cerrado (sin tapa), mínima a 1800 rpm sin carga','138 kPa (20 psi)'],
+  ['Presión del bloque con termostato cerrado, máxima','275 kPa (40 psi)'],['Temperatura máxima de operación','100 °C'],['Temperatura mínima recomendada','70 °C'],['Tiempo máximo de desaireación','35 min'],['Tapa de presión mínima recomendada','48 kPa (7 psi)']]},
+ admision:{t:'Admisión de aire (industrial)',pg:'V-5',parts:['codo_filtro_aire','conducto_aire','colector_admision','sensor_presion_admision','sensor_temp_admision'],rows:[
+  ['Restricción máxima, filtro limpio','381 mm H₂O (15 in H₂O)'],['Restricción máxima, filtro sucio','635 mm H₂O (25 in H₂O)'],['Aumento máximo de temperatura, ambiente → entrada del motor (sobre 0 °C)','35 °C']]},
+ escape:{t:'Escape (industrial)',pg:'V-6, V-19',parts:['colector_escape','codo_escape','turbo','juntas_colector'],rows:[
+  ['Diámetro interior aceptable del tubo de escape','102 mm (4 in)'],['Restricción máxima del escape','1016 mm H₂O (75 mm Hg)'],['Torque de las tuercas de montaje del turbo (llave 16 mm)','68 N·m (50 ft·lb)']]},
+ comb:{t:'Combustible (industrial)',pg:'V-2, V-19',parts:['filtro_combustible','bomba_combustible','valvula_corte','sensor_presion_riel','tuberia_combustible','cabezal_filtro_comb'],rows:[
+  ['Temperatura máxima del combustible de entrada','71 °C'],['Restricción máxima de entrada, filtro limpio','102 mm Hg (4 in Hg)'],['Restricción máxima de entrada, filtro sucio','203 mm Hg (8 in Hg)'],
+  ['Restricción máxima de drenaje','63 mm Hg (2,5 in Hg)'],['Velocidad mínima de arranque','120 rpm'],['Tornillos de montaje de la bomba (7/16")','47 N·m (35 ft·lb)'],['Soporte de la bomba al bloque','47 N·m (35 ft·lb)'],['Soporte de la bomba a la carcasa (7/16")','11 N·m (95 in·lb)']]},
+ culata:{t:'Tren de válvulas, inyectores y freno motor',pg:'5-3, 5-4, V-19',parts:['tapa_balancines','freno_motor','solenoides_freno'],pref:['balancin','valvulas','muelles','inyector','embolo_iny','esclavo_freno','varilla','eje_balancines'],rows:[
+  ['Holgura de válvulas de admisión (recomprobación)','0,10–0,41 mm'],['Holgura de válvulas de escape (recomprobación)','0,46–0,76 mm'],['Holgura del inyector (recomprobación)','0,51–2,03 mm (0,020–0,080 in)'],
+  ['Secuencia girando el motor','A → 1 · B → 5 · C → 3 · A → 6 · B → 2 · C → 4'],['Contratuerca del tornillo de ajuste de válvula e inyector (3/4")','61 N·m (45 ft·lb)'],['Contratuerca del tornillo de ajuste del freno motor','50 N·m (40 ft·lb)'],
+  ['Abrazaderas de sujeción del inyector','75 N·m (55 ft·lb)'],['Tornillos de la tapa del respiradero del cárter (6 mm)','0,68 N·m (6 in·lb)'],['Tornillos de la tapa de balancines (13 mm)','15 N·m (130 in·lb)']]},
+ correas:{t:'Correas y accionamiento de accesorios',pg:'V-18, V-19',parts:['correa','tensor','alternador','cubo_ventilador','amortiguador_polea'],rows:[
+  ['Correa 8 costillas: tensión nueva / usada','890 N / 360–710 N'],['Correa 10 costillas: tensión nueva / usada','1110 N / 440–890 N'],['Correa 12 costillas: tensión nueva / usada','1330 N / 530–1070 N'],
+  ['Nota','La tabla no aplica a tensores automáticos. Una correa se considera usada tras 10 minutos de servicio.'],['Contratuerca del eje de la polea tensora del ventilador','165–190 N·m (120–140 ft·lb)']]},
+ electrico:{t:'Sistema eléctrico (24 V)',pg:'V-7',parts:['motor_arranque','ecm','mazo_cables'],rows:[
+  ['Resistencia máxima del circuito de arranque','0,002 Ω'],['Caída de voltaje máxima del circuito de arranque','1,7 V'],['Arranque sin ayuda (industrial)','hasta −12 °C'],['Velocidad mínima de arranque','120 rpm'],
+  ['Baterías a −18 °C (CCA / reserva)','900 A / 320 min'],['Baterías a 0 °C (CCA / reserva)','640 A / 240 min'],['Voltaje mínimo en el conector del ECM para encenderlo','6,5 V']]},
+ aire:{t:'Compresor de aire 18,7 CFM',pg:'V-8',parts:['compresor_aire'],rows:[['Cilindros','1'],['Calibre × carrera','85 × 56 mm'],['Cilindrada','318 cm³'],['Alto × ancho × largo','217,4 × 142 × 216 mm'],['Peso','15 kg'],['Refrigeración y lubricación','Refrigerante y aceite del motor']]},
+};
+function specFor(id){ if(!id) return null; const base=id.replace(/_\d$/,'');
+  for(const k in SPECS){const s=SPECS[k]; if(s.parts.includes(id)||s.parts.includes(base)) return s; if(s.pref&&s.pref.some(p=>id.startsWith(p))) return s;} return null; }
+
 /* ================= TALLER: MANTENIMIENTO, SENSORES, FRENO MOTOR, COMBUSTIBLE ================= */
 const B=(x,y,z)=>new T.Vector3(x,z,-y);          // coordenadas de Blender → visor
 const INT={d:{n:'Diario',c:'#4fe3f0'},h250:{n:'250 h / 6 meses',c:'#9fe0b8'},h600:{n:'600 h / 1 año',c:'#f2d23c'},h1500:{n:'1500 h / 1 año',c:'#ffb347'},h6000:{n:'6000 h / 2 años',c:'#ff7a6e'}};
@@ -625,7 +749,8 @@ const FUEL=[
  {part:'inyector_1',t:'7. Inyectores accionados por leva',d:'La tercera leva de cada cilindro empuja, a través de su varilla y balancín, el émbolo del inyector. El émbolo baja y pulveriza el combustible a alta presión cerca del punto muerto superior (n.º 4).'},
  {part:'culata',t:'8. Drenaje y retorno',d:'El combustible sobrante sale por el drenaje de los inyectores (n.º 5) y vuelve al tanque, llevándose calor.'},
 ];
-let T_mode='mant', T_int='d', T_sel=-1, T_items=[];
+let T_mode='diag', T_int='d', T_sel=-1, T_items=[], D_cat='Todos', D_q='', D_sym=-1;
+const specTable=sp=>`<table class="spec"><tbody>${sp.rows.map(r=>`<tr><td>${r[0]}</td><td class="num">${r[1]}</td></tr>`).join('')}</tbody></table><div class="small">Fuente: manual O&M, pág. ${sp.pg}</div>`;
 const hotEls=[];
 function partCenter(id){const p=parts[id]; if(!p)return null; return new T.Box3().setFromObject(p).getCenter(new T.Vector3());}
 function itemPos(it){ if(it.b) return B(...it.b).add(it.part&&parts[it.part]?parts[it.part].parent.position.clone().sub(parts[it.part].parent.userData.base||new T.Vector3()):new T.Vector3()); return partCenter(it.part)||new T.Vector3(); }
@@ -636,23 +761,42 @@ function setHot(list){
     e.onclick=ev=>{ev.stopPropagation(); pickItem(k);}; $('#labels').appendChild(e); hotEls.push(e);});
 }
 function updateHot(w,h){
-  T_items.forEach((it,k)=>{const e=hotEls[k]; const p=itemPos(it); tmpV.copy(p).project(camera);
+  T_items.forEach((it,k)=>{const e=hotEls[k]; if(!it.part&&!it.b){e.style.display='none';return;} const p=itemPos(it); tmpV.copy(p).project(camera);
     if(tmpV.z>1||$('#tab-taller').hidden&&!S.tallerPins){e.style.display='none';return;}
     e.style.display='flex'; e.style.left=((tmpV.x+1)/2*w)+'px'; e.style.top=((1-tmpV.y)/2*h)+'px'; e.classList.toggle('on',k===T_sel);});
 }
 function pickItem(k){
   T_sel=k; const it=T_items[k]; renderTaller();
   if(it.part&&parts[it.part]){ if(!S.sys[PI_[it.part].sys]){S.sys[PI_[it.part].sys]=true;syncSys();applyVisibility();} select(it.part,true); }
-  const p=itemPos(it), dir=camera.position.clone().sub(controls.target).normalize();
-  flyTo(p.clone().addScaledVector(dir,950),p);
+  if(it.part||it.b){const p=itemPos(it), dir=camera.position.clone().sub(controls.target).normalize(); flyTo(p.clone().addScaledVector(dir,1350),p);}
   const el=document.getElementById('titem'+k); if(el) el.scrollIntoView({block:'nearest'});
 }
 function brakeLift(c,th){ if(!S.brake) return 0; const a=phaseOf(c,th).a; const d=a>360?a-720:a; return (d>-25&&d<35)?3.5*Math.sin((d+25)/60*Math.PI):0; }
 function renderTaller(){
   const el=$('#tab-taller');
-  const modes=[['mant','Mantenimiento'],['sens','Sensores'],['freno','Freno motor'],['comb','Combustible']];
+  const modes=[['diag','Diagnóstico'],['fichas','Fichas técnicas'],['mant','Mantenimiento'],['sens','Sensores'],['freno','Freno motor'],['comb','Combustible']];
   let h=`<div class="grid2" style="margin-bottom:10px">${modes.map(([k,n])=>`<button class="btn ${T_mode===k?'on':''}" data-tm="${k}">${n}</button>`).join('')}</div>`;
-  if(T_mode==='mant'){
+  let list=null;
+  if(T_mode==='diag'){
+    if(D_sym<0){
+      const cats=['Todos',...new Set(DIAG.map(d=>d.cat))];
+      const q=D_q.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      const found=DIAG.map((d,i)=>({d,i})).filter(({d})=>(D_cat==='Todos'||d.cat===D_cat)&&(!q||(d.t+' '+d.s.map(x=>x.c).join(' ')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(q)));
+      h+=`<h2>Diagnóstico por síntoma</h2><p class="small">47 árboles de la sección TS del manual (págs. TS-3 a TS-57). Elige el síntoma y revisa los pasos en orden: cada uno marca la pieza en el motor.</p>
+      <input id="dq" type="search" placeholder="Buscar: humo, presión, arranca, temperatura…" value="${esc(D_q)}" style="width:100%;padding:9px 10px;background:var(--bg2);border:1px solid var(--line2);border-radius:4px;margin:6px 0">
+      <div class="row" style="margin:6px 0">${cats.map(c=>`<button class="btn ${D_cat===c?'on':''}" data-dc="${c}" style="min-height:32px;padding:5px 9px;font-size:12px">${c}</button>`).join('')}</div>
+      <div class="partlist">${found.map(({d,i})=>`<button data-ds="${i}">${d.t} <span class="small">· ${d.s.length} pasos · ${d.pg}</span></button>`).join('')||'<p class="small">Sin resultados.</p>'}</div>
+      <div class="note warn" style="margin-top:10px">Los pasos y correcciones resumen el manual O&M. Las reparaciones que el manual deriva a un taller autorizado Cummins requieren personal capacitado.</div>`;
+      list=[];
+    } else {
+      const d=DIAG[D_sym];
+      h+=`<button class="btn" id="dback">◂ Síntomas</button><h2 style="margin-top:10px">${d.t}</h2><div class="small">${d.cat} · manual O&M, pág. ${d.pg}. Revisa en orden: si el paso está bien, pasa al siguiente.</div>`;
+      list=d.s.map((x,k)=>({part:x.p,t:`Paso ${k+1}: ${x.c}`,d:x.f,col:x.p?'#ffb347':'#8a949e'}));
+    }
+  } else if(T_mode==='fichas'){
+    h+=`<h2>Fichas técnicas</h2><p class="small">Especificaciones y torques de la Sección V del manual (aplicación industrial cuando hay diferencia). También aparecen en la pestaña Pieza al tocar un componente.</p>`;
+    list=Object.values(SPECS).map(sp=>({part:sp.parts[0],t:sp.t,d:specTable(sp)}));
+  } else if(T_mode==='mant'){
     h+=`<h2>Mapa de mantenimiento</h2><p class="small">Tabla de la pág. 2-3 del manual (aplicaciones marinas e industriales). Haz cada tarea en el intervalo que ocurra primero, horas o meses, y en cada intervalo repite también las tareas de los anteriores.</p>
     <div class="row" style="margin:8px 0">${Object.entries(INT).map(([k,v])=>`<button class="btn ${T_int===k?'on':''}" data-ti="${k}" style="border-color:${v.c}">${v.n}</button>`).join('')}</div>
     <button class="btn primary" id="tRoutine">Rutina guiada: ${INT[T_int].n}</button>`;
@@ -673,13 +817,17 @@ function renderTaller(){
   } else {
     h+=`<h2>Sistema de combustible</h2><p class="small">Recorrido según el diagrama de flujo del motor industrial (pág. 197) y los componentes de la pág. 59. Activa Rayos X para ver las partículas.</p>`;
   }
-  const list=T_mode==='mant'?MAINT.filter(m=>m.i===T_int).map(m=>({...m,col:INT[m.i].c})):T_mode==='sens'?SENS:T_mode==='comb'?FUEL:[{part:'freno_motor',t:'Carcasas del freno motor',d:'Una por cada dos cilindros, debajo de la tapa de balancines (catálogo pág. 29).'},{part:'solenoides_freno',t:'Solenoides',d:'Los activa el ECM. Dejan pasar aceite a presión hacia los pistones esclavos.'},{part:'esclavo_freno_1',t:'Pistón esclavo (cilindro 1)',d:'Empuja la cruceta de escape para abrir las válvulas cerca del punto muerto superior.'}];
+  if(!list) list=T_mode==='mant'?MAINT.filter(m=>m.i===T_int).map(m=>({...m,col:INT[m.i].c})):T_mode==='sens'?SENS:T_mode==='comb'?FUEL:[{part:'freno_motor',t:'Carcasas del freno motor',d:'Una por cada dos cilindros, debajo de la tapa de balancines (catálogo pág. 29).'},{part:'solenoides_freno',t:'Solenoides',d:'Los activa el ECM. Dejan pasar aceite a presión hacia los pistones esclavos.'},{part:'esclavo_freno_1',t:'Pistón esclavo (cilindro 1)',d:'Empuja la cruceta de escape para abrir las válvulas cerca del punto muerto superior.'}];
   if(JSON.stringify(list.map(x=>x.t))!==JSON.stringify(T_items.map(x=>x.t))) setHot(list);
   h+=`<div class="partlist" style="margin-top:10px">${list.map((it,k)=>`<div id="titem${k}" class="titem ${k===T_sel?'sel':''}">
     <button data-tk="${k}"><span class="hnum" style="--hc:${it.col||'var(--accent)'}">${k+1}</span> ${it.t}${it.en?` <span class="en small">${it.en}</span>`:''}</button>
     ${k===T_sel?`<div class="tdet">${it.how?`<p>${it.how}</p>`:''}${it.mide?`<p><b>Mide:</b> ${it.mide}</p><p><b>Uso en el ECM:</b> ${it.ecm}</p>`:''}${it.d?`<p>${it.d}</p>`:''}${it.warn?`<div class="note warn">${it.warn}</div>`:''}${it.pg?`<div class="small">Fuente: manual O&M, ${it.pg}</div>`:''}${k<list.length-1?`<button class="btn primary" data-tk="${k+1}" style="margin-top:8px">Siguiente ▸</button>`:''}</div>`:''}</div>`).join('')}</div>`;
   el.innerHTML=h;
   el.querySelectorAll('[data-tm]').forEach(b=>b.onclick=()=>enterMode(b.dataset.tm));
+  el.querySelectorAll('[data-dc]').forEach(b=>b.onclick=()=>{D_cat=b.dataset.dc; renderTaller();});
+  el.querySelectorAll('[data-ds]').forEach(b=>b.onclick=()=>{D_sym=+b.dataset.ds; T_items=[]; renderTaller(); el.scrollTop=0;});
+  const dq=$('#dq'); if(dq){dq.oninput=()=>{D_q=dq.value; const pos=dq.selectionStart; renderTaller(); const n=$('#dq'); n.focus(); n.setSelectionRange(pos,pos);};}
+  const db=$('#dback'); if(db) db.onclick=()=>{D_sym=-1; T_items=[]; renderTaller(); setSys(Object.keys(SYS)); S.xray=false; $('#xray').checked=false; applyMaterials(); applyVisibility(); syncQuick();};
   el.querySelectorAll('[data-ti]').forEach(b=>b.onclick=()=>{T_int=b.dataset.ti; renderTaller();});
   el.querySelectorAll('[data-tk]').forEach(b=>b.onclick=()=>pickItem(+b.dataset.tk));
   const r=$('#tRoutine'); if(r) r.onclick=()=>{pickItem(0); S.routine=true;};
@@ -687,7 +835,8 @@ function renderTaller(){
 }
 function enterMode(m){
   T_mode=m; S.routine=false;
-  if(m==='freno'){ setSys(['estructura','distribucion','freno','moviles','cigueñal','combustible']); S.xray=true; S.brake=true; flyTo(V(900,1050,1300),V(0,560,0)); }
+  if(m==='diag'||m==='fichas'){ setSys(Object.keys(SYS)); S.xray=false; S.brake=false; D_sym=-1; }
+  else if(m==='freno'){ setSys(['estructura','distribucion','freno','moviles','cigueñal','combustible']); S.xray=true; S.brake=true; flyTo(V(900,1050,1300),V(0,560,0)); }
   else if(m==='comb'){ setSys(['estructura','combustible','electronica','distribucion']); S.xray=true; S.brake=false; flyTo(V(700,900,-2300),V(-50,300,-100)); }
   else if(m==='sens'){ setSys(Object.keys(SYS)); S.xray=false; S.brake=false; }
   else { setSys(Object.keys(SYS)); S.xray=false; S.brake=false; }
@@ -828,6 +977,7 @@ function renderPart(){
     <dt>Fuente</dt><dd>${p.page&&p.page!=='—'?'Bulletin 3666, pág. '+esc(p.page):'No documentado en Bulletin 3666'}</dd></dl>
     ${p.ver.length?`<h3 class="st-ver">Datos verificados</h3><ul class="clean">${p.ver.map(x=>`<li>✓ ${esc(x)}</li>`).join('')}</ul>`:''}
     ${p.est.length?`<h3 class="st-est">Estimado o simplificado</h3><ul class="clean">${p.est.map(x=>`<li>≈ ${esc(x)}</li>`).join('')}</ul>`:''}
+    ${specFor(id)?`<h3>Ficha técnica · ${specFor(id).t}</h3>${specTable(specFor(id))}`:''}
     <div class="row" style="margin-top:10px"><button class="btn" id="focusBtn">Centrar cámara</button><button class="btn" id="isoBtn">Aislar sistema</button><button class="btn" id="clrBtn">Quitar selección</button></div>`+list;
   $('#focusBtn').onclick=()=>focusPart(id);
   $('#isoBtn').onclick=()=>{for(const k in S.sys)S.sys[k]=(k===p.sys||k==='cigueñal'&&p.sys==='moviles'); syncSys(); applyVisibility();};
