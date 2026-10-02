@@ -18,6 +18,7 @@
   --f-body:"IBM Plex Sans","Segoe UI",Roboto,Arial,sans-serif;
   --f-mono:"IBM Plex Mono",Consolas,"Courier New",monospace;
   color-scheme:dark;
+  --pw:clamp(410px,35vw,620px);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
@@ -48,12 +49,14 @@ button{cursor:pointer}
 #tip{position:fixed;z-index:6;pointer-events:none;background:rgba(10,13,17,.9);border:1px solid var(--line2);padding:5px 8px;font-size:12px;border-radius:3px;display:none;white-space:nowrap}
 
 /* Panel lateral */
-#panel{position:fixed;z-index:7;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 120px);width:372px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(8px);min-height:0}
+#panel{position:fixed;z-index:7;top:calc(env(safe-area-inset-top,0px) + 12px);right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 120px);width:var(--pw);font-size:clamp(14px,.35vw + 10.5px,17px);display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:6px;backdrop-filter:blur(8px);min-height:0}
 #tabs{display:flex;border-bottom:1px solid var(--line);flex-shrink:0;overflow-x:auto}
-#tabs button{flex:1;background:none;border:0;padding:11px 6px 9px;color:var(--muted);font:600 14px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;border-bottom:2px solid transparent;white-space:nowrap}
+#tabs button{flex:1;background:none;border:0;padding:14px 5px 11px;color:var(--muted);font:600 clamp(14px,.3vw + 11px,17px)/1 var(--f-display);letter-spacing:.05em;text-transform:uppercase;border-bottom:2px solid transparent;white-space:nowrap}
 #tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent)}
-.tabpane{padding:14px 16px 18px;overflow-y:auto;min-height:0;flex:1}
-.tabpane h2{font:700 22px/1.05 var(--f-display);letter-spacing:.02em;margin:0 0 4px;text-wrap:balance}
+#tabs button[data-tab="taller"]{color:var(--accent);font-weight:700}
+#tabs button[data-tab="taller"][aria-selected="true"]{background:rgba(212,176,106,.12);color:var(--accent)}
+.tabpane{padding:16px 18px 22px;overflow-y:auto;min-height:0;flex:1}
+.tabpane h2{font:700 clamp(22px,.6vw + 16px,28px)/1.05 var(--f-display);letter-spacing:.02em;margin:0 0 4px;text-wrap:balance}
 .tabpane h3{font:600 13px/1.2 var(--f-display);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:18px 0 8px}
 .en{color:var(--muted);font-style:italic}
 .small{font-size:12px;color:var(--muted)}
@@ -88,7 +91,7 @@ details{border-top:1px solid var(--line);padding:8px 0}
 summary{cursor:pointer;font-weight:600}
 
 /* Barra de animación */
-#transport{position:fixed;z-index:8;left:12px;right:396px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;backdrop-filter:blur(8px)}
+#transport{position:fixed;z-index:8;left:12px;right:calc(var(--pw) + 24px);bottom:calc(env(safe-area-inset-bottom,0px) + 12px);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;backdrop-filter:blur(8px)}
 #transport .grp{display:flex;gap:6px;align-items:center}
 #transport .btn{min-width:42px;padding:7px 10px}
 #angle{font:500 28px/1 var(--f-mono);font-variant-numeric:tabular-nums;min-width:4.2ch;text-align:right}
@@ -107,7 +110,7 @@ summary{cursor:pointer;font-weight:600}
 #fo em.now{background:#ffb347;color:#1a1005}
 
 /* Disclaimer permanente */
-#disc{position:fixed;z-index:4;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 118px);max-width:min(560px,calc(100vw - 420px));font-size:11px;line-height:1.35;color:#a9b3bd;background:rgba(10,13,17,.62);border:1px solid var(--line);border-radius:4px;padding:6px 9px}
+#disc{position:fixed;z-index:4;left:16px;bottom:calc(env(safe-area-inset-bottom,0px) + 118px);max-width:min(560px,calc(100vw - var(--pw) - 60px));font-size:11px;line-height:1.35;color:#a9b3bd;background:rgba(10,13,17,.62);border:1px solid var(--line);border-radius:4px;padding:6px 9px}
 #disc b{color:var(--est);letter-spacing:.06em}
 
 /* Recorrido */
@@ -135,7 +138,7 @@ ol.steps li{margin:6px 0;padding-left:2px}
 table.spec{min-width:0;width:100%;margin:6px 0}
 table.spec td{padding:5px 4px;font-size:12.5px}
 table.spec td.num{text-align:right;white-space:normal;color:var(--fg)}
-#quick{position:fixed;z-index:6;top:calc(env(safe-area-inset-top,0px) + 14px);right:398px;display:flex;flex-direction:column;gap:8px}
+#quick{position:fixed;z-index:6;top:calc(env(safe-area-inset-top,0px) + 14px);right:calc(var(--pw) + 26px);display:flex;flex-direction:column;gap:8px}
 #quick button{display:flex;align-items:center;gap:8px;min-height:44px;padding:8px 14px;background:var(--panel);border:1px solid var(--line2);border-radius:6px;font:600 15px/1 var(--f-display);letter-spacing:.08em;text-transform:uppercase;backdrop-filter:blur(8px)}
 #quick button:hover{border-color:var(--accent)}
 #quick button.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -144,10 +147,10 @@ table.spec td.num{text-align:right;white-space:normal;color:var(--fg)}
 @media (max-width:900px){
   #brand h1{font-size:24px;white-space:nowrap}
   #brand p,#brand .badge{display:none}
-  #panel{left:0;right:0;width:auto;top:auto;bottom:0;height:52vh;border-radius:10px 10px 0 0;transform:translateY(calc(100% + 2px));transition:transform .25s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
+  #panel{left:0;right:0;width:auto;top:auto;bottom:0;height:46vh;border-radius:10px 10px 0 0;transform:translateY(calc(100% + 2px));transition:transform .25s ease;padding-bottom:env(safe-area-inset-bottom,0px)}
   #panel.open{transform:none}
   #transport{left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);gap:8px;padding:8px}
-  #panel.open ~ #transport{bottom:calc(52vh + 8px)}
+  #panel.open ~ #transport{bottom:calc(46vh + 8px)}
   #cyls{order:5;min-width:100%}
   #speedwrap{min-width:110px}
   #panelToggle{display:inline-flex}
@@ -158,7 +161,12 @@ table.spec td.num{text-align:right;white-space:normal;color:var(--fg)}
   #quick button{padding:8px 10px;font-size:13px}
   #quick button span{display:none}
 }
+@media (pointer:coarse){.btn{min-height:46px}label.sw{padding:10px 2px}.partlist button{padding:11px 2px}#quick button{min-height:48px}}
+@media (min-width:901px) and (max-width:1180px){:root{--pw:clamp(400px,40vw,470px)}}
 @media (prefers-reduced-motion:reduce){#panel{transition:none}}
+.bigdisc{border:2px solid var(--est);border-radius:8px;background:rgba(240,144,58,.1);padding:14px 16px;margin:6px 0 14px}
+.bigdisc b.t{display:block;font:700 clamp(17px,.5vw + 12px,22px)/1.15 var(--f-display);letter-spacing:.06em;text-transform:uppercase;color:var(--est);margin-bottom:6px}
+.bigdisc p{margin:6px 0;font-size:1.02em;color:var(--fg)}
 </style>
 </head>
 <body>
@@ -176,15 +184,16 @@ table.spec td.num{text-align:right;white-space:normal;color:var(--fg)}
 
 <aside id="panel" aria-label="Panel de información">
   <nav id="tabs" role="tablist">
-    <button role="tab" data-tab="pieza" aria-selected="true">Pieza</button>
+    <button role="tab" data-tab="taller" aria-selected="true">Taller</button>
+    <button role="tab" data-tab="pieza" aria-selected="false">Pieza</button>
     <button role="tab" data-tab="vista" aria-selected="false">Vista</button>
     <button role="tab" data-tab="sistemas" aria-selected="false">Sistemas</button>
-    <button role="tab" data-tab="taller" aria-selected="false">Taller</button>
     <button role="tab" data-tab="datos" aria-selected="false">Datos</button>
     <button role="tab" data-tab="aprender" aria-selected="false">Aprender</button>
   </nav>
 
-  <section class="tabpane" id="tab-pieza"></section>
+  <section class="tabpane" id="tab-taller"></section>
+  <section class="tabpane" id="tab-pieza" hidden></section>
 
   <section class="tabpane" id="tab-vista" hidden>
     <h3>Cámara</h3>
@@ -227,7 +236,6 @@ table.spec td.num{text-align:right;white-space:normal;color:var(--fg)}
     <div class="note">Las rutas de tuberías siguen la lógica de los diagramas de flujo del manual (págs. 196–220), pero su trazado en 3D es esquemático.</div>
   </section>
 
-  <section class="tabpane" id="tab-taller" hidden></section>
   <section class="tabpane" id="tab-datos" hidden></section>
   <section class="tabpane" id="tab-aprender" hidden></section>
 </aside>
@@ -1125,7 +1133,12 @@ function renderTaller(){
     h+=`<h2>Fichas técnicas</h2><p class="small">Especificaciones y torques de la Sección V del manual (aplicación industrial cuando hay diferencia). También aparecen en la pestaña Pieza al tocar un componente.</p>`;
     list=Object.values(SPECS).map(sp=>({part:sp.parts[0],t:sp.t,d:specTable(sp)}));
   } else if(T_mode==='mant'){
-    h+=`<h2>Mapa de mantenimiento</h2><p class="small">Tabla de la pág. 2-3 del manual (aplicaciones marinas e industriales). Haz cada tarea en el intervalo que ocurra primero, horas o meses, y en cada intervalo repite también las tareas de los anteriores.</p>
+    h+=`<h2>Mapa de mantenimiento</h2>
+    <div class="bigdisc"><b class="t">⚠ Según el manual del fabricante</b>
+      <p><b>Intervalos y tareas de acuerdo con el Manual de Operación y Mantenimiento Cummins QSM11 (Bulletin 3666), tabla de la pág. 2-3.</b></p>
+      <p>Cada tarea se hace en el intervalo que ocurra primero, horas o meses, y en cada intervalo se repiten también las tareas de los anteriores. El cambio de aceite depende del tipo de trabajo (tabla de la pág. 2-4).</p>
+      <p>Si el programa de tu equipo o tu faena define otros intervalos, confírmalos antes de aplicarlos.</p>
+      <button class="mlink" data-mp="91,92" style="font-size:1em;padding:6px 12px">📖 Ver la tabla original (págs. 2-3 y 2-4)</button></div>
     <div class="row" style="margin:8px 0">${Object.entries(INT).map(([k,v])=>`<button class="btn ${T_int===k?'on':''}" data-ti="${k}" style="border-color:${v.c}">${v.n}</button>`).join('')}</div>
     <button class="btn primary" id="tRoutine">Rutina guiada: ${INT[T_int].n}</button>`;
   } else if(T_mode==='sens'){
@@ -1332,7 +1345,7 @@ function focusPart(id){const b=new T.Box3().setFromObject(parts[id]); if(b.isEmp
 function showTab(t){document.querySelectorAll('#tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===t));
   document.querySelectorAll('.tabpane').forEach(p=>p.hidden=p.id!=='tab-'+t);}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
-$('#panelToggle').onclick=()=>$('#panel').classList.toggle('open');
+$('#panelToggle').onclick=()=>{$('#panel').classList.toggle('open'); setTimeout(applyViewOffset,0);};
 
 // Cámara
 const VIEWS={front:[V(2600,320,0),V(0,240,0)],rear:[V(-2600,320,0),V(0,240,0)],side:[V(0,320,2900),V(0,240,0)],top:[V(1,3200,0),V(0,150,0)],iso:[V(1900,1250,2100),V(0,220,0)],reset:[V(2100,1150,2300),V(0,220,0)]};
@@ -1528,7 +1541,15 @@ function axisLabel(txt,col,pos){const c=document.createElement('canvas');c.width
 axisLabel('X','#ff6b6b',V(1.35,0,0));axisLabel('Y','#7ee07e',V(0,1.35,0));axisLabel('Z','#6ba8ff',V(0,0,1.35));
 
 /* ================= BUCLE ================= */
-function resize(){const w=stage.clientWidth,h=stage.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix();}
+function resize(){const w=stage.clientWidth,h=stage.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h; applyViewOffset();}
+// En pantallas angostas el panel y la barra tapan la parte baja: se desplaza la vista para centrar el motor en lo que queda visible
+function applyViewOffset(){
+  const w=stage.clientWidth,h=stage.clientHeight;
+  if(window.innerWidth<=900){ const tr=document.getElementById('transport').getBoundingClientRect(), pn=document.getElementById('panel'), open=pn.classList.contains('open');
+    const occ=open?pn.offsetHeight+tr.height+18:tr.height+10; camera.setViewOffset(w,h,0,Math.round(occ/2-10),w,h); }
+  else camera.clearViewOffset();
+  camera.updateProjectionMatrix();
+}
 window.addEventListener('resize',resize);
 let last=performance.now(), turboA=0;
 function loop(now){
@@ -1560,7 +1581,7 @@ $('#mvclose').onclick=()=>{$('#mview').hidden=true;};
 $('#mvprev').onclick=()=>{if(MV.i>0){MV.i--;drawManual();}}; $('#mvnext').onclick=()=>{if(MV.i<MV.list.length-1){MV.i++;drawManual();}};
 $('#mvzi').onclick=()=>{MV.z=Math.min(3,MV.z+.35);drawManual();}; $('#mvzo').onclick=()=>{MV.z=Math.max(.6,MV.z-.35);drawManual();};
 document.addEventListener('keydown',e=>{if($('#mview').hidden)return; if(e.key==='Escape')$('#mview').hidden=true; if(e.key==='ArrowRight')$('#mvnext').click(); if(e.key==='ArrowLeft')$('#mvprev').click();});
-syncSys(); renderPart(); renderDatos(); renderLearn(); renderTaller(); applySection(); applyMaterials(); applyExplode();
+syncSys(); renderPart(); renderDatos(); renderLearn(); renderTaller(); showTab('taller'); if(window.innerWidth<=900) $('#panel').classList.add('open'); applyViewOffset(); applySection(); applyMaterials(); applyExplode();
 resize(); controls.target.copy(VIEWS.reset[1]); camera.position.copy(VIEWS.reset[1]).add(VIEWS.reset[0].clone().sub(VIEWS.reset[1]).multiplyScalar(fitK()));
 requestAnimationFrame(loop);
 window.__qsm={S,parts,pistons,phaseOf,PHI,XC,count:()=>({pistons:Object.keys(pistons).length,rods:Object.keys(rods).length,valves:valves.length*2})};
