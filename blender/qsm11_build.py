@@ -324,17 +324,17 @@ def build_head():
                 bm_cyl(bm, 17, 17, 16, (x, s * 120, HEAD_TOP + 8), 'Z', 20)
                 bm_cyl(bm, 11, 11, 24, (x, s * 120, HEAD_TOP + 12), 'Z', 6)   # cabeza hexagonal
     pieces.append(part('hd_bolts', STEEL, '_tmp', bosses))
-    # bridas de puertos: admisión (+Y) y escape (-Y)
+    # bridas de puertos en el lado de escape (-Y): admisión arriba, escape abajo (O&M pág. 29)
     def flanges(bm):
         for c in range(1, 7):
-            bm_box(bm, 95, 14, 62, (XC(c), 171, DECK + 70))
-            bm_box(bm, 80, 14, 58, (XC(c), -171, DECK + 66))
+            bm_box(bm, 95, 14, 52, (XC(c), -171, DECK + 100))
+            bm_box(bm, 80, 14, 50, (XC(c), -171, DECK + 42))
     pieces.append(part('hd_flanges', PAINT2, '_tmp', flanges, (3, 1)))
     hd = join('culata', pieces, 'Estructura')
     ports = []
     for c in range(1, 7):
-        ports.append(cutter(lambda bm, c=c: bm_prism(bm, rrect(66, 40, 12), 60, 'XZ', loc=(XC(c), 172, DECK + 70))))
-        ports.append(cutter(lambda bm, c=c: bm_cyl(bm, 22, 22, 60, (XC(c), -172, DECK + 66), 'Y', 24)))
+        ports.append(cutter(lambda bm, c=c: bm_prism(bm, rrect(66, 34, 12), 60, 'XZ', loc=(XC(c), -172, DECK + 100))))
+        ports.append(cutter(lambda bm, c=c: bm_cyl(bm, 20, 20, 60, (XC(c), -172, DECK + 42), 'Y', 24)))
     boolean(hd, ports)
     return meta(hd, 'estructura', 'Culata', 'E')
 
@@ -602,25 +602,27 @@ def build_valvetrain():
     return objs
 
 # ================================================================= ADMISIÓN
+TURBO = Vector((RFOB + 30, -330, HEAD_TOP + 40))
 def build_intake():
-    # colector de admisión (cat. pág. 60): cajón largo con brida y entrada superior
+    # colector de admisión (cat. pág. 60) en el lado de escape, sobre el colector de escape (O&M pág. 29)
+    IMX, IML, IMY, IMZ = 55.0, 770.0, -232.0, DECK + 100
     pieces = []
-    pieces.append(part('im_body', ALU, '_tmp', lambda bm: bm_prism(bm, rrect(90, 110, 22), BLOCK_L - 60, 'YZ', loc=(0, 230, DECK + 72)), (4, 2)))
-    pieces.append(part('im_flange', ALU, '_tmp', lambda bm: bm_box(bm, BLOCK_L - 40, 12, 130, (0, 182, DECK + 72)), (3, 1)))
-    pieces.append(part('im_inlet', ALU, '_tmp', lambda bm: bm_box(bm, 120, 100, 70, (-60, 235, DECK + 155)), (8, 3)))
+    pieces.append(part('im_body', ALU, '_tmp', lambda bm: bm_prism(bm, rrect(70, 90, 18), IML, 'YZ', loc=(IMX, IMY, IMZ)), (4, 2)))
+    pieces.append(part('im_flange', ALU, '_tmp', lambda bm: bm_box(bm, IML + 20, 12, 64, (IMX, -183, IMZ)), (3, 1)))
+    pieces.append(part('im_inlet', ALU, '_tmp', lambda bm: bm_box(bm, 120, 80, 70, (-250, IMY, IMZ + 65)), (8, 3)))
     def bolts(bm):
-        for i in range(16):
-            for z in (DECK + 20, DECK + 124): bm_cyl(bm, 7, 7, 12, (RFOB + 50 + i * (BLOCK_L - 100) / 15, 192, z), 'Y', 6)
+        for i in range(14):
+            for z in (IMZ - 24, IMZ + 24): bm_cyl(bm, 7, 7, 12, (IMX - IML / 2 + 30 + i * (IML - 60) / 13, -192, z), 'Y', 6)
     pieces.append(part('im_bolts', STEEL, '_tmp', bolts))
     o = join('colector_admision', pieces, 'Admision')
     meta(o, 'admision', 'Colector de admisión', 'C')
-    # codo de transferencia de aire desde el turbo (cat. pág. 64) + manguera Ø102
+    tx, ty, tz = TURBO
     def elbow(bm):
-        bm_sweep(bm, [(-60, 235, DECK + 190), (-70, 235, DECK + 260), (-150, 120, HEAD_TOP + 175), (-280, -100, HEAD_TOP + 190), (RFOB - 20, -190, HEAD_TOP + 130), (RFOB - 55, -215, HEAD_TOP + 50)], 51, 28)
+        bm_sweep(bm, [(tx - 85, ty + 100, tz + 10), (tx - 95, ty + 100, tz + 110), (-420, -240, tz + 150), (-250, IMY, tz + 120), (-250, IMY, IMZ + 100)], 51, 28)
     e = part('conducto_aire', ALU, 'Admision', elbow)
     meta(e, 'turbo', 'Conducto de aire turbo → colector (Ø102)', 'C')
     def clamps(bm):
-        bm_tube(bm, 56, 50, 14, (-62, 235, DECK + 210), 'Z', 32)
+        bm_tube(bm, 56, 50, 14, (-250, IMY, IMZ + 108), 'Z', 32)
     cl = part('abrazaderas', STEEL, 'Admision', clamps)
     meta(cl, 'admision', 'Abrazaderas', 'E')
     return [o, e, cl]
@@ -628,17 +630,17 @@ def build_intake():
 # ================================================================= ESCAPE Y TURBO
 def build_exhaust():
     objs = []
-    # colector de escape en 3 secciones con brida por cilindro y codos
+    # colector de escape (debajo del de admisión) con codos por cilindro
     def manifold(bm):
         for c in range(1, 7):
-            bm_box(bm, 80, 16, 70, (XC(c), -186, DECK + 66))
-            bm_sweep(bm, [(XC(c), -192, DECK + 66), (XC(c), -225, DECK + 70), (XC(c) - 20, -250, DECK + 95)], 26, 20)
-        bm_sweep(bm, [(FFOB - 70, -252, DECK + 98), (0, -255, DECK + 100), (RFOB + 70, -258, DECK + 105), (RFOB + 60, -258, HEAD_TOP - 20)], [38] * 37, 28)
+            bm_box(bm, 80, 16, 50, (XC(c), -186, DECK + 42))
+            bm_sweep(bm, [(XC(c), -192, DECK + 42), (XC(c), -232, DECK + 36), (XC(c) - 20, -272, DECK + 18)], 24, 20)
+        bm_sweep(bm, [(FFOB - 70, -275, DECK + 15), (0, -276, DECK + 15), (RFOB + 70, -278, DECK + 15), (RFOB + 62, -300, DECK + 60)], [36] * 37, 28)
     o = part('colector_escape', HOT, 'Escape', manifold)
     meta(o, 'escape', 'Colector de escape (3 piezas)', 'E'); objs.append(o)
     def joints(bm):
         for x in (PITCH, -PITCH):
-            bm_tube(bm, 42, 36, 12, (x, -255, DECK + 100), 'X', 28)
+            bm_tube(bm, 40, 34, 12, (x, -276, DECK + 15), 'X', 28)
     j = part('juntas_colector', STEEL, 'Escape', joints)
     meta(j, 'escape', 'Juntas deslizantes del colector', 'E'); objs.append(j)
     return objs
@@ -655,7 +657,6 @@ def volute(bm, center, axis_rot, r_base, r_tube0, r_tube1, turns=0.9, seg=48, ri
     bmesh.ops.transform(tmp, verts=tmp.verts, matrix=Matrix.Translation(center) @ axis_rot)
     me = bpy.data.meshes.new('t'); tmp.to_mesh(me); tmp.free(); bm.from_mesh(me); bpy.data.meshes.remove(me)
 
-TURBO = Vector((RFOB + 30, -330, HEAD_TOP + 40))
 def build_turbo():
     objs = []
     tx, ty, tz = TURBO
@@ -663,7 +664,7 @@ def build_turbo():
     pieces = []
     pieces.append(part('tb_turb', HOT, '_tmp', lambda bm: volute(bm, (tx + 55, ty, tz), Matrix.Identity(4), 52, 22, 52)))
     pieces.append(part('tb_turb_core', HOT, '_tmp', lambda bm: bm_cyl(bm, 70, 62, 80, (tx + 55, ty, tz), 'X', 40), (3, 2)))
-    pieces.append(part('tb_inlet', HOT, '_tmp', lambda bm: bm_sweep(bm, [(tx + 60, ty + 40, tz - 70), (tx + 70, ty + 70, tz - 100), (RFOB + 60, -258, HEAD_TOP - 20)], 34, 24)))
+    pieces.append(part('tb_inlet', HOT, '_tmp', lambda bm: bm_sweep(bm, [(tx + 60, ty + 40, tz - 70), (tx + 65, ty + 45, tz - 120), (RFOB + 62, -300, DECK + 60)], 34, 24)))
     pieces.append(part('tb_flange', HOT, '_tmp', lambda bm: bm_box(bm, 16, 90, 90, (tx + 60, ty + 55, tz - 85)), (3, 1)))
     pieces.append(part('tb_outlet', HOT, '_tmp', lambda bm: bm_tube(bm, 52, 44, 50, (tx + 120, ty, tz), 'X', 40)))
     pieces.append(part('tb_vband', STEEL, '_tmp', lambda bm: bm_tube(bm, 58, 52, 14, (tx + 145, ty, tz), 'X', 40)))
@@ -705,14 +706,20 @@ def build_fuel_side():
         for i in range(10): bm_box(bm, 280, 8, 6, (110, 262, 85 + i * 20))
         for k in range(3): bm_box(bm, 60, 36, 46, (10 + k * 80, 250, 300))
     pieces.append(part('ecm_fins', BLACK, '_tmp', fins))
-    o = join('ecm', pieces, 'Combustible'); meta(o, 'accesorios', 'ECM con placa de refrigeración', 'C'); objs.append(o)
-    # bomba de combustible (cat. págs. 46–48)
+    o = join('ecm', pieces, 'Combustible'); meta(o, 'electronica', 'ECM con placa de refrigeración', 'V'); objs.append(o)
+    # bomba de combustible (cat. págs. 46–49): cuerpo, bomba de engranajes, actuadores y accionamiento
     pieces = []
-    pieces.append(part('fp_body', ALU, '_tmp', lambda bm: bm_box(bm, 170, 110, 140, (-250, 270, 240)), (12, 3)))
-    pieces.append(part('fp_gear', ALU, '_tmp', lambda bm: bm_cyl(bm, 62, 62, 60, (-250, 250, 330), 'Y', 40), (4, 2)))
-    pieces.append(part('fp_actuators', BLACK, '_tmp', lambda bm: [bm_cyl(bm, 22, 22, 50, (-300 + k * 50, 335, 260), 'Y', 20) for k in range(3)]))
-    pieces.append(part('fp_drive', IRON, '_tmp', lambda bm: bm_cyl(bm, 50, 50, 40, (-150, 230, 240), 'X', 32), (3, 2)))
+    pieces.append(part('fp_body', ALU, '_tmp', lambda bm: bm_box(bm, 170, 100, 130, (-250, 265, 240)), (12, 3)))
+    pieces.append(part('fp_gear', ALU, '_tmp', lambda bm: bm_cyl(bm, 52, 52, 64, (-367, 262, 240), 'X', 40), (4, 2)))
+    pieces.append(part('fp_gearcap', IRON, '_tmp', lambda bm: bm_cyl(bm, 44, 44, 10, (-404, 262, 240), 'X', 32)))
+    pieces.append(part('fp_actuators', BLACK, '_tmp', lambda bm: [bm_cyl(bm, 19, 19, 52, (-285 + k * 60, 265, 330), 'Z', 20) for k in range(2)]))
+    pieces.append(part('fp_screen', ALU, '_tmp', lambda bm: bm_cyl(bm, 24, 24, 40, (-300, 330, 200), 'Y', 24), (2, 1)))
+    pieces.append(part('fp_drive', IRON, '_tmp', lambda bm: bm_cyl(bm, 48, 48, 40, (-145, 230, 240), 'X', 32), (3, 2)))
     o = join('bomba_combustible', pieces, 'Combustible'); meta(o, 'combustible', 'Bomba de combustible', 'C'); objs.append(o)
+    def shutoff(bm):
+        bm_cyl(bm, 24, 24, 56, (-195, 335, 300), 'Y', 24)
+        bm_box(bm, 30, 24, 26, (-195, 370, 300))
+    o = part('valvula_corte', BRASS, 'Combustible', shutoff, (2, 1)); meta(o, 'combustible', 'Válvula de corte de combustible', 'V'); objs.append(o)
     # filtro de combustible (cat. pág. 40)
     def ff(bm):
         bm_cyl(bm, 52, 52, 200, (-20, 270, -10), 'Z', 40)
@@ -851,6 +858,68 @@ def build_lines():
     o = part('tuberia_aceite_turbo', STEEL, 'Lubricacion', turbo_oil); meta(o, 'lubricacion', 'Alimentación y retorno de aceite del turbo', 'E'); objs.append(o)
     return objs
 
+
+# ================================================================= FRENO MOTOR (bajo la tapa de balancines)
+def build_engine_brake():
+    objs = []
+    def housings(bm):
+        for a, b in ((1, 2), (3, 4), (5, 6)):
+            cx = (XC(a) + XC(b)) / 2
+            bm_box(bm, 2 * PITCH - 14, 170, 24, (cx, -20, HEAD_TOP + 96))
+            for c in (a, b):
+                bm_cyl(bm, 20, 20, 22, (XC(c) - 36, -36, HEAD_TOP + 80), 'Z', 20)   # alojamiento del pistón esclavo
+    o = part('freno_motor', REDP, 'Distribucion', housings, (3, 1)); meta(o, 'freno', 'Carcasas del freno motor', 'C'); objs.append(o)
+    def solenoids(bm):
+        for a, b in ((1, 2), (3, 4), (5, 6)):
+            cx = (XC(a) + XC(b)) / 2
+            bm_cyl(bm, 22, 22, 50, (cx, -60, HEAD_TOP + 130), 'Z', 24)
+            bm_box(bm, 30, 20, 16, (cx, -60, HEAD_TOP + 160))
+        bm_sweep(bm, [((XC(1) + XC(2)) / 2, -60, HEAD_TOP + 170), (0, -70, HEAD_TOP + 175), ((XC(5) + XC(6)) / 2, -60, HEAD_TOP + 170), (RFOB + 40, -150, HEAD_TOP + 120)], 4, 8)
+    o = part('solenoides_freno', BLACK, 'Distribucion', solenoids, (2, 1)); meta(o, 'freno', 'Solenoides del freno motor', 'C'); objs.append(o)
+    for c in range(1, 7):
+        o = part(f'esclavo_freno_{c}', STEEL, 'Distribucion', lambda bm: bm_cyl(bm, 14, 14, 26, (0, 0, 0), 'Z', 20))
+        o.location = (XC(c) - 36, -36, HEAD_TOP + 74)
+        meta(o, 'freno', f'Pistón esclavo del freno · cilindro {c}', 'E'); objs.append(o)
+    return objs
+
+def build_injector_plungers():
+    objs = []
+    for c in range(1, 7):
+        def plunger(bm):
+            bm_cyl(bm, 9, 9, 34, (0, 0, 0), 'Z', 16)
+            bm_cyl(bm, 15, 15, 6, (0, 0, 17), 'Z', 16)
+        o = part(f'embolo_iny_{c}', STEEL, 'Combustible', plunger); o.location = (XC(c), 0, HEAD_TOP + 50)
+        meta(o, 'combustible', f'Émbolo del inyector · cilindro {c}', 'C'); objs.append(o)
+    return objs
+
+SENSORS = [
+    ('sensor_presion_admision', (100, -232, DECK + 152), 'Z'),
+    ('sensor_temp_admision', (-80, -232, DECK + 152), 'Z'),
+    ('sensor_temp_refrigerante', (FFOB - 40, -48, HEAD_TOP + 10), 'Y'),
+    ('sensor_aceite', (300, 210, 60), 'Y'),
+    ('sensor_posicion_motor', (-120, 210, 175), 'Y'),
+    ('sensor_velocidad_volante', (RFOB - 40, 190, 185), 'Y'),
+    ('sensor_presion_ambiente', (270, 240, 305), 'Z'),
+    ('sensor_presion_riel', (-250, 322, 280), 'Y'),
+    ('sensor_agua_combustible', (-20, 270, -122), 'Z'),
+    ('sensor_ventilador', (FFOB + 62, 19, 330), 'X'),
+]
+def build_sensors():
+    objs = []
+    for name, loc, ax in SENSORS:
+        sgn = -1 if name in ('sensor_agua_combustible',) else 1
+        def sens(bm, ax=ax, sgn=sgn):
+            d = {'X': Vector((1, 0, 0)), 'Y': Vector((0, 1, 0)), 'Z': Vector((0, 0, 1))}[ax] * sgn
+            bm_cyl(bm, 10, 10, 10, tuple(d * 5), ax, 6)
+            bm_cyl(bm, 9, 9, 26, tuple(d * 22), ax, 16)
+            bm_box(bm, 22, 22, 22, tuple(d * 42))
+        o = part(name, BLACK, 'Electronica', sens, (1.5, 1)); finish(o); o.location = loc
+        meta(o, 'electronica', name, 'V'); objs.append(o)
+    # mazo de cables principal (lado bomba)
+    w = part('mazo_cables', BLACK, 'Electronica', lambda bm: bm_sweep(bm, [(270, 240, 330), (110, 260, 330), (-120, 230, 210), (-250, 330, 290), (-300, 240, 120), (RFOB - 30, 200, 200)], 6, 8))
+    meta(w, 'electronica', 'Mazo de cables del motor', 'E'); objs.append(w)
+    return objs
+
 # ================================================================= CONSTRUCCIÓN
 print('Construyendo QSM11…')
 build_block(); build_mains(); build_liners()
@@ -862,6 +931,7 @@ for c in range(1, 7):
 build_camshaft(); build_valvetrain()
 build_intake(); build_exhaust(); build_turbo()
 build_fuel_side(); build_oil_side(); build_front(); build_lines()
+build_engine_brake(); build_injector_plungers(); build_sensors()
 
 if '_tmp' in COLL:
     for o in list(COLL['_tmp'].objects): bpy.data.objects.remove(o)
